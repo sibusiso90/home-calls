@@ -11,7 +11,7 @@ from fadecall.pricing import (
     travel_band,
 )
 from fadecall.ranking import rank_score
-from fadecall.scheduling import next_slot
+from fadecall.scheduling import free_slots, is_free, next_slot
 from fadecall.timeutil import SAST
 
 
@@ -78,12 +78,29 @@ def test_areas_are_real_and_close() -> None:
 
 def test_next_slot_rules() -> None:
     mon_10 = datetime(2026, 10, 26, 10, 0, tzinfo=SAST)  # Monday
-    assert next_slot(mon_10, []) == datetime(2026, 10, 26, 16, 0, tzinfo=SAST)
-    mon_1530 = datetime(2026, 10, 26, 15, 30, tzinfo=SAST)
-    assert next_slot(mon_1530, []) == datetime(2026, 10, 27, 16, 0, tzinfo=SAST)
-    fri_17 = datetime(2026, 10, 30, 17, 0, tzinfo=SAST)
-    assert next_slot(fri_17, []) == datetime(2026, 10, 31, 9, 0, tzinfo=SAST)
-    sat_10 = datetime(2026, 10, 31, 10, 0, tzinfo=SAST)
-    assert next_slot(sat_10, []) == datetime(2026, 11, 2, 16, 0, tzinfo=SAST)
-    booked = [datetime(2026, 10, 26, 16, 0, tzinfo=SAST)]
-    assert next_slot(mon_10, booked) == datetime(2026, 10, 27, 16, 0, tzinfo=SAST)
+    assert next_slot(mon_10, []) == datetime(2026, 10, 26, 11, 0, tzinfo=SAST)  # same day
+    mon_1810 = datetime(2026, 10, 26, 18, 10, tzinfo=SAST)
+    assert next_slot(mon_1810, []) == datetime(2026, 10, 26, 19, 30, tzinfo=SAST)
+    mon_1930 = datetime(2026, 10, 26, 19, 30, tzinfo=SAST)
+    assert next_slot(mon_1930, []) == datetime(2026, 10, 27, 8, 0, tzinfo=SAST)
+    sat_1630 = datetime(2026, 10, 31, 16, 30, tzinfo=SAST)
+    assert next_slot(sat_1630, []) == datetime(2026, 10, 31, 17, 30, tzinfo=SAST)
+    sat_2000 = datetime(2026, 10, 31, 20, 0, tzinfo=SAST)
+    assert next_slot(sat_2000, []) == datetime(2026, 11, 1, 9, 0, tzinfo=SAST)  # Sunday opens 09:00
+
+
+def test_bookings_block_overlapping_slots() -> None:
+    mon_10 = datetime(2026, 10, 26, 10, 0, tzinfo=SAST)
+    # 11:00-11:50 booked: with 30 min travel either side, a 45 min cut fits at 12:30 at the
+    # earliest after it, and nothing that would end after 10:30 can start before it.
+    busy = [
+        (datetime(2026, 10, 26, 11, 0, tzinfo=SAST), datetime(2026, 10, 26, 11, 50, tzinfo=SAST))
+    ]
+    assert next_slot(mon_10, busy) == datetime(2026, 10, 26, 12, 30, tzinfo=SAST)
+    assert not is_free(datetime(2026, 10, 26, 12, 0, tzinfo=SAST), 45, busy)
+    assert is_free(datetime(2026, 10, 26, 12, 30, tzinfo=SAST), 45, busy)
+    early = datetime(2026, 10, 26, 10, 0, tzinfo=SAST)
+    assert not is_free(early, 45, busy) and is_free(early, 30, busy)
+    today = free_slots(mon_10, busy, 45, days=0)
+    assert today[0] == datetime(2026, 10, 26, 12, 30, tzinfo=SAST)
+    assert today[-1] == datetime(2026, 10, 26, 20, 0, tzinfo=SAST)

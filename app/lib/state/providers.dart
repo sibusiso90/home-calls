@@ -136,9 +136,20 @@ final jobProvider = FutureProvider.family<Job, String>((ref, id) {
   return ref.watch(apiProvider).job(id);
 });
 
-/// A barber's free slots for the next two weeks (reschedule picker).
-final barberSlotsProvider = FutureProvider.family<List<DateTime>, String>(
-  (ref, barberId) => ref.watch(apiProvider).barberSlots(barberId, days: 14),
+/// Which barber's free slots to show, for a cut of [minutes]. [excludeJobId]
+/// is the booking being moved (its own time counts as free).
+typedef SlotQuery = ({String barberId, int minutes, String? excludeJobId});
+
+/// A barber's free slots for the next two weeks (booking and reschedule).
+final barberSlotsProvider = FutureProvider.family<List<DateTime>, SlotQuery>(
+  (ref, q) => ref
+      .watch(apiProvider)
+      .barberSlots(
+        q.barberId,
+        days: 14,
+        minutes: q.minutes,
+        excludeJobId: q.excludeJobId,
+      ),
 );
 
 final matchesProvider = FutureProvider.family<List<BarberMatch>, String>(

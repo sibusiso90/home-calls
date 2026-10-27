@@ -317,10 +317,17 @@ final class HttpFadeCallApi implements FadeCallApi {
       );
 
   @override
-  Future<List<DateTime>> barberSlots(String barberId, {int days = 7}) async {
+  Future<List<DateTime>> barberSlots(
+    String barberId, {
+    int days = 7,
+    int minutes = 45,
+    String? excludeJobId,
+  }) async {
     final body = _obj(
       await _get('/barbers/${Uri.encodeComponent(barberId)}/slots', {
         'days': '$days',
+        'minutes': '$minutes',
+        'exclude_job_id': ?excludeJobId,
       }),
     );
     return body.strings('slots').map(DateTime.parse).toList();

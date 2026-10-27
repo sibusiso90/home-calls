@@ -17,22 +17,28 @@ from typing import Literal
 
 from sqlalchemy.orm import Session
 
+from .. import scheduling
 from ..errors import conflict, validation
 from ..models import Job
-from ..scheduling import candidate_slots
+from ..scheduling import DEFAULT_MINUTES, is_bookable, is_free
 from ..timeutil import ensure_utc, utcnow
 from .notifications import barber_uid, client_uid, notify, when
-from .quotes import booked_slots
+from .quotes import busy_intervals
 
 OPEN_STATUSES = ("booked", "confirmed")
 MAX_SLOT_DAYS = 28
 
 
 def free_slots(
-    db: Session, barber_id: str, days: int = 7, now: datetime | None = None
+    db: Session,
+    barber_id: str,
+    days: int = 7,
+    minutes: int = DEFAULT_MINUTES,
+    now: datetime | None = None,
+    exclude_job_id: str | None = None,
 ) -> list[datetime]:
-    taken = {ensure_utc(s) for s in booked_slots(db, barber_id)}
-    return [s for s in candidate_slots(now or utcnow(), days) if ensure_utc(s) not in taken]
+    busy = busy_intervals(db, barber_id, exclude_job_id)
+    return scheduling.free_slots(now or utcnow(), busy, minutes, days)
 
 
 def is_late(job: Job, now: datetime, late_cancel_hours: float) -> bool:
@@ -95,12 +101,10 @@ def reschedule_job(db: Session, job: Job, slot_start: datetime, now: datetime | 
     new_slot = ensure_utc(slot_start)
     if new_slot == ensure_utc(job.slot_start):
         raise validation("That is already the booked time")
-    valid = {ensure_utc(s) for s in candidate_slots(now, MAX_SLOT_DAYS)}
-    if new_slot not in valid:
+    if not is_bookable(new_slot, now, MAX_SLOT_DAYS):
         raise validation("That time is not a bookable slot")
-    taken = {ensure_utc(s) for s in booked_slots(db, job.barber_id)}
-    if new_slot in taken:
-        raise conflict("That slot is already booked")
+    if not is_free(new_slot, job.minutes, busy_intervals(db, job.barber_id, job.id)):
+        raise conflict("That time clashes with another booking")
     old = when(job)
     job.slot_start = new_slot
     job.slot_end = new_slot + timedelta(minutes=job.minutes)

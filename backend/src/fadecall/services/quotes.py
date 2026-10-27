@@ -19,7 +19,7 @@ from ..imaging import normalise_photo, render_overlay
 from ..models import Barber, Client, Job, Quote, new_id
 from ..pricing import quote_price, travel_band
 from ..ranking import rank_score
-from ..scheduling import next_slot
+from ..scheduling import Busy, is_free, next_slot
 from ..serializers import barber_card_json
 from ..storage import Storage, UrlSigner
 from ..timeutil import ensure_utc, iso, utcnow
@@ -187,12 +187,14 @@ def _new_quote(
     )
 
 
-def booked_slots(db: Session, barber_id: str) -> list[datetime]:
-    return list(
-        db.scalars(
-            select(Job.slot_start).where(Job.barber_id == barber_id, Job.status != "cancelled")
-        )
+def busy_intervals(db: Session, barber_id: str, exclude_job_id: str | None = None) -> list[Busy]:
+    """Start and end of every live booking for a barber (cancelled ones free their time)."""
+    q = select(Job.slot_start, Job.slot_end).where(
+        Job.barber_id == barber_id, Job.status != "cancelled"
     )
+    if exclude_job_id is not None:
+        q = q.where(Job.id != exclude_job_id)
+    return [(start, end) for start, end in db.execute(q)]
 
 
 def match_barbers(
@@ -218,7 +220,7 @@ def match_barbers(
                 "distance_km": round(dist, 1),
                 "travel_band": band,
                 "price": price.as_dict(),
-                "next_slot": iso(next_slot(now, booked_slots(db, b.id))),
+                "next_slot": iso(next_slot(now, busy_intervals(db, b.id), quote.minutes)),
                 "score": rank_score(b.tier, b.verified_jobs, b.rating, dist),
             }
         )
@@ -250,8 +252,8 @@ def book_job(
     if band is None:
         raise conflict("That barber is out of travel range for this area")
     slot_utc = ensure_utc(slot_start)
-    if slot_utc in {ensure_utc(s) for s in booked_slots(db, barber.id)}:
-        raise ApiError(409, "conflict", "That slot is already booked")
+    if not is_free(slot_utc, quote.minutes, busy_intervals(db, barber.id)):
+        raise ApiError(409, "conflict", "That time clashes with another booking")
     if not address.strip():
         raise validation("address is required")
     price = quote_price(barber.tier, quote.minutes, band)

@@ -270,9 +270,34 @@ def test_slots_endpoint_validation(client: TestClient) -> None:
     assert (
         c.get(f"/barbers/{barber['id']}/slots", headers=ch, params={"days": 0}).status_code == 422
     )
-    week = c.get(f"/barbers/{barber['id']}/slots", headers=ch).json()["slots"]
-    assert 5 <= len(week) <= 7  # Mon–Sat slots, no Sundays
-    assert all(datetime.fromisoformat(s).weekday() != 6 for s in week)
+    week = [
+        datetime.fromisoformat(s)
+        for s in c.get(f"/barbers/{barber['id']}/slots", headers=ch).json()["slots"]
+    ]
+    assert len(week) > 7 * 10  # every 30 minutes through each day
+    assert all(s.minute in (0, 30) for s in week)
+    assert all(
+        (9, 0) <= (s.hour, s.minute) <= (17, 0)
+        if s.weekday() == 6
+        else (8, 0) <= (s.hour, s.minute) <= (20, 0)
+        for s in week
+    )
+    assert week[0] - datetime.now(week[0].tzinfo) >= timedelta(hours=1)
+
+    # A booking hides every start time that would clash with it (cut + travel).
+    job = quote_and_book(c, ch, barber["id"], pay_deposit=False)
+    start = datetime.fromisoformat(job["slot_start"])
+    after = [
+        datetime.fromisoformat(s)
+        for s in c.get(f"/barbers/{barber['id']}/slots", headers=ch).json()["slots"]
+    ]
+    assert start not in after and start + timedelta(minutes=30) not in after
+    moved = c.get(
+        f"/barbers/{barber['id']}/slots",
+        headers=ch,
+        params={"minutes": job["minutes"], "exclude_job_id": job["id"]},
+    ).json()["slots"]
+    assert job["slot_start"] in moved or start in [datetime.fromisoformat(s) for s in moved]
 
 
 # --- WhatsApp stub ----------------------------------------------------------------

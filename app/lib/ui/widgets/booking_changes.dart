@@ -6,6 +6,7 @@ import 'package:fade_call/data/api_exception.dart';
 import 'package:fade_call/data/models/models.dart';
 import 'package:fade_call/state/providers.dart';
 import 'package:fade_call/ui/widgets/common.dart';
+import 'package:fade_call/ui/widgets/slot_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -247,6 +248,12 @@ class RescheduleSheet extends ConsumerStatefulWidget {
 
 class _RescheduleSheetState extends ConsumerState<RescheduleSheet> {
   DateTime? _picked;
+
+  SlotQuery get _query => (
+    barberId: widget.job.barber.id,
+    minutes: widget.job.minutes,
+    excludeJobId: widget.job.id,
+  );
   bool _saving = false;
   String? _error;
 
@@ -254,7 +261,7 @@ class _RescheduleSheetState extends ConsumerState<RescheduleSheet> {
     final slot = _picked;
     if (slot == null) return;
     final container = ProviderScope.containerOf(context, listen: false);
-    final slots = barberSlotsProvider(widget.job.barber.id);
+    final slots = barberSlotsProvider(_query);
     setState(() {
       _saving = true;
       _error = null;
@@ -275,7 +282,7 @@ class _RescheduleSheetState extends ConsumerState<RescheduleSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final slots = ref.watch(barberSlotsProvider(widget.job.barber.id));
+    final slots = ref.watch(barberSlotsProvider(_query));
     return Padding(
       padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, Gap.lg),
       child: Column(
@@ -294,8 +301,7 @@ class _RescheduleSheetState extends ConsumerState<RescheduleSheet> {
             constraints: const BoxConstraints(maxHeight: 320),
             child: AsyncView(
               value: slots,
-              onRetry: () =>
-                  ref.invalidate(barberSlotsProvider(widget.job.barber.id)),
+              onRetry: () => ref.invalidate(barberSlotsProvider(_query)),
               isEmpty: (s) => s.isEmpty,
               empty: const MessageView(
                 icon: Icons.event_busy_rounded,
@@ -303,17 +309,13 @@ class _RescheduleSheetState extends ConsumerState<RescheduleSheet> {
                 message: 'This barber is fully booked for the next two weeks.',
               ),
               builder: (list) => SingleChildScrollView(
-                child: Wrap(
-                  spacing: Gap.sm,
-                  runSpacing: Gap.sm,
-                  children: [
+                child: SlotPicker(
+                  slots: [
                     for (final s in list)
-                      ChoiceChip(
-                        label: Text(formatSlot(s)),
-                        selected: _picked == s,
-                        onSelected: (_) => setState(() => _picked = s),
-                      ),
+                      if (s != widget.job.slotStart) s,
                   ],
+                  selected: _picked,
+                  onSelected: (s) => setState(() => _picked = s),
                 ),
               ),
             ),

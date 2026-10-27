@@ -6,6 +6,7 @@ import 'package:fade_call/router.dart';
 import 'package:fade_call/state/providers.dart';
 import 'package:fade_call/ui/widgets/badges.dart';
 import 'package:fade_call/ui/widgets/common.dart';
+import 'package:fade_call/ui/widgets/slot_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,13 +16,19 @@ Future<void> showBookingSheet(
   required String quoteId,
   required BarberMatch match,
   required String? areaId,
+  int? minutes,
 }) => showModalBottomSheet<void>(
   useRootNavigator: true,
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
   constraints: const BoxConstraints(maxWidth: 640),
-  builder: (_) => BookingSheet(quoteId: quoteId, match: match, areaId: areaId),
+  builder: (_) => BookingSheet(
+    quoteId: quoteId,
+    match: match,
+    areaId: areaId,
+    minutes: minutes,
+  ),
 );
 
 class BookingSheet extends ConsumerStatefulWidget {
@@ -30,11 +37,15 @@ class BookingSheet extends ConsumerStatefulWidget {
     required this.match,
     required this.areaId,
     super.key,
+    this.minutes,
   });
 
   final String quoteId;
   final BarberMatch match;
   final String? areaId;
+
+  /// The quoted cut's length, so only times it fits into are offered.
+  final int? minutes;
 
   @override
   ConsumerState<BookingSheet> createState() => _BookingSheetState();
@@ -45,10 +56,17 @@ enum _LocationSource { device, area }
 class _BookingSheetState extends ConsumerState<BookingSheet> {
   final _address = TextEditingController();
   ({double lat, double lng, _LocationSource source, double? accuracy})? _point;
+  late DateTime? _slot = widget.match.nextSlot;
   bool _locating = false;
   bool _booking = false;
   String? _error;
   String? _locationNote;
+
+  SlotQuery get _slotQuery => (
+    barberId: widget.match.barber.id,
+    minutes: widget.minutes ?? 45,
+    excludeJobId: null,
+  );
 
   @override
   void initState() {
@@ -106,12 +124,16 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
 
   Future<void> _book() async {
     final point = _point;
-    final slot = widget.match.nextSlot;
+    final slot = _slot;
     if (_address.text.trim().length < 5) {
       setState(() => _error = 'Enter the street address for the barber.');
       return;
     }
-    if (point == null || slot == null) {
+    if (slot == null) {
+      setState(() => _error = 'Pick a time for the cut.');
+      return;
+    }
+    if (point == null) {
       setState(() => _error = 'Use your location so we can find you.');
       return;
     }
@@ -135,6 +157,8 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
       Navigator.of(context).pop();
       GoRouter.of(context).go(Routes.clientJob(job.id, confirmed: true));
     } on Object catch (e) {
+      // The time may have just been taken: show what is still free.
+      ref.invalidate(barberSlotsProvider(_slotQuery));
       if (mounted) setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) setState(() => _booking = false);
@@ -172,24 +196,33 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
               ],
             ),
             const SizedBox(height: Gap.lg),
-            Panel(
-              child: Row(
-                children: [
-                  Icon(Icons.event_rounded, color: context.colors.primary),
-                  const SizedBox(width: Gap.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Slot', style: context.text.labelMedium),
-                        Text(
-                          formatSlot(m.nextSlot),
-                          style: context.text.titleMedium,
-                        ),
-                      ],
-                    ),
+            Row(
+              children: [
+                Icon(Icons.event_rounded, color: context.colors.primary),
+                const SizedBox(width: Gap.sm),
+                Expanded(
+                  child: Text(
+                    _slot == null ? 'Pick a time' : formatSlot(_slot),
+                    key: const ValueKey('booking-slot'),
+                    style: context.text.titleMedium,
                   ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: Gap.sm),
+            AsyncView(
+              value: ref.watch(barberSlotsProvider(_slotQuery)),
+              onRetry: () => ref.invalidate(barberSlotsProvider(_slotQuery)),
+              isEmpty: (s) => s.isEmpty,
+              empty: const MessageView(
+                icon: Icons.event_busy_rounded,
+                title: 'No free times',
+                message: 'This barber is fully booked for the next two weeks.',
+              ),
+              builder: (slots) => SlotPicker(
+                slots: slots,
+                selected: _slot,
+                onSelected: (s) => setState(() => _slot = s),
               ),
             ),
             const SizedBox(height: Gap.md),

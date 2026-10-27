@@ -61,7 +61,15 @@ abstract interface class FadeCallApi {
 
   Future<Job> cancelJob(String id, {required String reason});
   Future<Job> rescheduleJob(String id, {required DateTime slotStart});
-  Future<List<DateTime>> barberSlots(String barberId, {int days = 7});
+
+  /// Free start times for a cut of [minutes]; [excludeJobId] is the booking
+  /// being moved, so its own time counts as free.
+  Future<List<DateTime>> barberSlots(
+    String barberId, {
+    int days = 7,
+    int minutes = 45,
+    String? excludeJobId,
+  });
 
   // Notifications
   Future<NotificationInbox> notifications();

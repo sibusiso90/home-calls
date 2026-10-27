@@ -11,13 +11,14 @@ from pydantic import BaseModel
 from ..auth import ClientUser, CurrentUser
 from ..cuts import CUTS
 from ..deps import DB, Models, Signer, Store
-from ..errors import forbidden, not_found
+from ..errors import forbidden, not_found, validation
 from ..models import Barber, Quote, get_by_id
+from ..scheduling import DEFAULT_MINUTES, is_bookable
 from ..serializers import job_json, quote_json
 from ..services import quotes as svc
 from ..services.accounts import client_for, find_client
 from ..services.lifecycle import MAX_SLOT_DAYS, free_slots
-from ..timeutil import ensure_aware, iso
+from ..timeutil import ensure_aware, iso, utcnow
 
 router = APIRouter(tags=["client"])
 
@@ -101,11 +102,15 @@ def barber_slots(
     user: CurrentUser,
     db: DB,
     days: int = Query(7, ge=1, le=MAX_SLOT_DAYS),
+    minutes: int = Query(DEFAULT_MINUTES, ge=10, le=180),
+    exclude_job_id: str | None = None,
 ) -> dict[str, Any]:
+    """Free start times for a cut of `minutes`; pass the job being moved as exclude_job_id."""
     barber = get_by_id(db, Barber, barber_id)
     if barber is None or (barber.status != "approved" and user.role != "operator"):
         raise not_found("Approved barber")
-    return {"barber_id": barber.id, "slots": [iso(s) for s in free_slots(db, barber.id, days)]}
+    slots = free_slots(db, barber.id, days, minutes, exclude_job_id=exclude_job_id)
+    return {"barber_id": barber.id, "slots": [iso(s) for s in slots]}
 
 
 class BookBody(BaseModel):
@@ -120,6 +125,8 @@ class BookBody(BaseModel):
 @router.post("/jobs")
 def book(body: BookBody, user: ClientUser, db: DB, signer: Signer) -> dict[str, Any]:
     client = client_for(db, user)
+    if not is_bookable(ensure_aware(body.slot_start), utcnow(), MAX_SLOT_DAYS):
+        raise validation("That time is not a bookable slot")
     job = svc.book_job(
         db,
         client,

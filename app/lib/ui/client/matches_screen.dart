@@ -67,6 +67,7 @@ class MatchesScreen extends ConsumerWidget {
                   quoteId: quoteId,
                   match: m,
                   areaId: quote?.areaId,
+                  minutes: quote?.minutes,
                 ),
               ),
               const SizedBox(height: Gap.md),
