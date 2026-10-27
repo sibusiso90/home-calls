@@ -162,10 +162,13 @@ def _new_quote(
         cut_name = picked.name
     else:
         cut_name = str(data.get("cut_name") or "Haircut")
+    # Never suggest the cut being quoted: "quote this cut instead" would be a no-op.
+    seen = {picked.id} if picked else set()
     suggestions = []
     for s in data.get("suggestions") or []:
         cut = get_cut(str(s.get("cut_id") or ""))
-        if cut is not None and all(x["cut_id"] != cut.id for x in suggestions):
+        if cut is not None and cut.id not in seen:
+            seen.add(cut.id)
             suggestions.append({"cut_id": cut.id, "why": str(s.get("why") or "")})
     return Quote(
         id=qid,

@@ -115,3 +115,22 @@ def test_catalog_job_runs_proof_without_reference(client: TestClient) -> None:
     assert proof(client, bh, job, "before", img(2, "full", 5), 1).status_code == 200
     after = proof(client, bh, job, "after", img(2, "fade", 5), 50)
     assert after.status_code == 200, after.text
+
+
+def test_suggestions_never_repeat_the_quoted_cut() -> None:
+    from types import SimpleNamespace
+
+    from fadecall.services.quotes import _new_quote
+
+    a, b = CUT_IDS[0], CUT_IDS[1]
+    data = {
+        "cut_id": a,
+        "minutes": 40,
+        "suggestions": [{"cut_id": a, "why": "same"}, {"cut_id": b, "why": "other"}],
+    }
+    models = SimpleNamespace(versions={"spark": "s", "sam": "m"})
+    q = _new_quote(
+        "q1", SimpleNamespace(id="c1"), "midrand-central", "reference", None, data, 0.0, models
+    )
+    assert q.cut_id == a
+    assert [s["cut_id"] for s in q.suggestions] == [b]

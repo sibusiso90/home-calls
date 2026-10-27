@@ -161,8 +161,8 @@ Return:
   estimated the time.
 - face_advice: 1-2 friendly sentences on what tends to suit this client, judged from face
   shape, hairline and hair texture, and whether the quoted cut is a good match.
-- suggestions: up to 3 catalog cuts that would suit this client best, best first, each with a
-  one-sentence why. Include the quoted cut only if it is one of the best.
+- suggestions: up to 3 other catalog cuts that would suit this client, best first, each with a
+  one-sentence why. Never repeat the quoted cut; these are alternatives to it.
 Talk only about hair, face shape and hairline as a barber would. Never identify the person or
 comment on age, race, attractiveness or anything else about them."""
 
