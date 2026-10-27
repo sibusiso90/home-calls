@@ -8,6 +8,7 @@ import 'package:fade_call/router.dart';
 import 'package:fade_call/state/providers.dart';
 import 'package:fade_call/state/quote_state.dart';
 import 'package:fade_call/ui/widgets/ai_attribution.dart';
+import 'package:fade_call/ui/widgets/camera_capture_screen.dart';
 import 'package:fade_call/ui/widgets/common.dart';
 import 'package:fade_call/ui/widgets/consent_gate.dart';
 import 'package:fade_call/ui/widgets/fade_app_bar.dart';
@@ -59,13 +60,22 @@ class _QuoteForm extends ConsumerWidget {
   const _QuoteForm();
 
   Future<void> _pick(
+    BuildContext context,
     WidgetRef ref, {
     required bool selfie,
     required bool camera,
   }) async {
-    final file = await ref
-        .read(mediaPickerProvider)
-        .pickImage(name: selfie ? 'selfie' : 'reference', camera: camera);
+    final name = selfie ? 'selfie' : 'reference';
+    // Live camera via getUserMedia: a file input's camera hint is ignored on
+    // desktop browsers (e.g. a phone used as a Continuity Camera webcam).
+    final file = camera
+        ? await captureWithCamera(
+            context,
+            name: name,
+            title: selfie ? 'Take a selfie' : 'Photo of the cut',
+            selfie: selfie,
+          )
+        : await ref.read(mediaPickerProvider).pickImage(name: name);
     if (file == null) return;
     final c = ref.read(quoteControllerProvider.notifier);
     selfie ? c.setSelfie(file) : c.setReference(file);
@@ -120,8 +130,9 @@ class _QuoteForm extends ConsumerWidget {
                 hint: 'Face the camera, hair visible',
                 icon: Icons.face_retouching_natural_rounded,
                 file: draft.selfie,
-                onCamera: () => _pick(ref, selfie: true, camera: true),
-                onGallery: () => _pick(ref, selfie: true, camera: false),
+                onCamera: () => _pick(context, ref, selfie: true, camera: true),
+                onGallery: () =>
+                    _pick(context, ref, selfie: true, camera: false),
               ),
             ),
             const SizedBox(width: Gap.sm + 4),
@@ -178,8 +189,10 @@ class _QuoteForm extends ConsumerWidget {
                   hint: 'A photo of the exact cut you want',
                   icon: Icons.style_rounded,
                   file: draft.reference,
-                  onCamera: () => _pick(ref, selfie: false, camera: true),
-                  onGallery: () => _pick(ref, selfie: false, camera: false),
+                  onCamera: () =>
+                      _pick(context, ref, selfie: false, camera: true),
+                  onGallery: () =>
+                      _pick(context, ref, selfie: false, camera: false),
                 ),
               ),
               const SizedBox(width: Gap.sm + 4),
