@@ -61,7 +61,7 @@ String? notificationTarget(Role role, AppNotification n) => switch (role) {
   Role.operator => switch (n.kind) {
     NotificationKind.disputeOpened ||
     NotificationKind.disputeResolved => Routes.opsDisputes,
-    NotificationKind.verdictNeedsReview => Routes.opsReviews,
+    _ when n.jobId != null => Routes.opsJob(n.jobId!),
     _ => Routes.opsOverview,
   },
   _ => null,

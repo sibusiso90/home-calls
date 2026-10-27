@@ -141,6 +141,14 @@ final matchesProvider = FutureProvider.family<List<BarberMatch>, String>(
   (ref, quoteId) => ref.watch(apiProvider).matches(quoteId),
 );
 
+/// Refreshes a job through a container captured before an `await`, so it
+/// still works if the widget that started the request has been disposed.
+void refreshJobIn(ProviderContainer container, String id) {
+  container
+    ..invalidate(jobProvider(id))
+    ..invalidate(jobsProvider);
+}
+
 extension RefreshX on WidgetRef {
   /// Refreshes a job everywhere it is shown.
   void refreshJob(String id) {
@@ -163,9 +171,23 @@ final pendingBarbersProvider = FutureProvider<List<Barber>>((ref) {
   return ref.watch(apiProvider).opsBarbers();
 });
 
-final reviewJobsProvider = FutureProvider<List<Job>>((ref) {
+/// Every job, newest first; the operator jobs page filters client-side.
+final opsJobsProvider = FutureProvider<List<Job>>((ref) {
   ref.watch(currentUserIdProvider);
-  return ref.watch(apiProvider).opsJobs();
+  return ref.watch(apiProvider).opsJobs(status: null);
+});
+
+final allBarbersProvider = FutureProvider<List<Barber>>((ref) {
+  ref.watch(currentUserIdProvider);
+  return ref.watch(apiProvider).opsBarbers(status: null);
+});
+
+final opsBarberProvider = FutureProvider.family<BarberDetail, String>((
+  ref,
+  id,
+) {
+  ref.watch(currentUserIdProvider);
+  return ref.watch(apiProvider).opsBarber(id);
 });
 
 final disputesProvider = FutureProvider<List<Dispute>>((ref) {

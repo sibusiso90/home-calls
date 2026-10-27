@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -130,6 +131,7 @@ async def _verify(
     after_jpg: bytes,
     cap: Capture,
 ) -> Evidence:
+    started = time.perf_counter()
     ev = job.evidence
     if ev is None or not ev.before_key:
         raise conflict("Before photo is missing; retake it")
@@ -201,6 +203,7 @@ async def _verify(
             "after": cap.capture_mode,
         },
     )
+    ev.elapsed_ms = int((time.perf_counter() - started) * 1000)
     apply_verdict(db, job, result.verdict, result.reasons, "model")
     db.commit()
     return ev

@@ -37,6 +37,8 @@ final class Dispute {
     this.job,
     this.resolutionReason,
     this.resolvedAt,
+    this.modelVersions = const {},
+    this.elapsedMs,
   });
 
   factory Dispute.fromJson(Json json) => Dispute(
@@ -51,6 +53,8 @@ final class Dispute {
     createdAt: json.timeOrNull('created_at'),
     resolutionReason: json.strOrNull('resolution_reason'),
     resolvedAt: json.timeOrNull('resolved_at'),
+    modelVersions: json.stringMap('model_versions'),
+    elapsedMs: json.intOrNull('elapsed_ms'),
     job: switch (json.objOrNull('job')) {
       final j? => Job.fromJson(j),
       null => null,
@@ -68,6 +72,8 @@ final class Dispute {
   final DateTime? createdAt;
   final String? resolutionReason;
   final DateTime? resolvedAt;
+  final Map<String, String> modelVersions;
+  final int? elapsedMs;
 
   /// `/ops/disputes` embeds the job; elsewhere it is absent.
   final Job? job;

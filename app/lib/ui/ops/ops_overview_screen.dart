@@ -3,6 +3,7 @@ import 'package:fade_call/core/theme.dart';
 import 'package:fade_call/router.dart';
 import 'package:fade_call/state/providers.dart';
 import 'package:fade_call/ui/ops/ops_common.dart';
+import 'package:fade_call/ui/widgets/ai_attribution.dart';
 import 'package:fade_call/ui/widgets/common.dart';
 import 'package:fade_call/ui/widgets/fade_app_bar.dart';
 import 'package:flutter/material.dart';
@@ -42,51 +43,70 @@ class OpsOverviewScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: Gap.lg),
-            LayoutBuilder(
-              builder: (context, c) {
-                final columns = c.maxWidth >= 900
-                    ? 4
-                    : c.maxWidth >= 520
-                    ? 2
-                    : 1;
-                final width = (c.maxWidth - Gap.md * (columns - 1)) / columns;
-                final tiles = [
-                  _Tile(
-                    label: 'Barbers awaiting approval',
-                    value: '${s.barbersPending}',
-                    icon: Icons.how_to_reg_rounded,
-                    attention: s.barbersPending > 0,
-                    onTap: () => context.go(Routes.opsBarbers),
-                  ),
-                  _Tile(
-                    label: 'Jobs needing review',
-                    value: '${s.jobsNeedsReview}',
-                    icon: Icons.fact_check_rounded,
-                    attention: s.jobsNeedsReview > 0,
-                    onTap: () => context.go(Routes.opsReviews),
-                  ),
-                  _Tile(
-                    label: 'Open disputes',
-                    value: '${s.openDisputes}',
-                    icon: Icons.record_voice_over_rounded,
-                    attention: s.openDisputes > 0,
-                    onTap: () => context.go(Routes.opsDisputes),
-                  ),
-                  _Tile(
-                    label: 'Payouts released',
-                    value: rand(s.payoutsReleasedZar),
-                    icon: Icons.payments_rounded,
-                    onTap: () => context.go(Routes.opsPayouts),
-                  ),
-                ];
-                return Wrap(
-                  spacing: Gap.md,
-                  runSpacing: Gap.md,
-                  children: [
-                    for (final t in tiles) SizedBox(width: width, child: t),
-                  ],
-                );
-              },
+            const SectionHeader(title: 'Needs you'),
+            _TileGrid(
+              tiles: [
+                _Tile(
+                  label: 'Barbers awaiting approval',
+                  value: '${s.barbersPending}',
+                  icon: Icons.how_to_reg_rounded,
+                  attention: s.barbersPending > 0,
+                  onTap: () => context.go(Routes.opsBarbers),
+                ),
+                _Tile(
+                  label: 'Jobs needing review',
+                  value: '${s.jobsNeedsReview}',
+                  icon: Icons.fact_check_rounded,
+                  attention: s.jobsNeedsReview > 0,
+                  onTap: () => context.go(Routes.opsJobs),
+                ),
+                _Tile(
+                  label: 'Open disputes',
+                  value: '${s.openDisputes}',
+                  icon: Icons.record_voice_over_rounded,
+                  attention: s.openDisputes > 0,
+                  onTap: () => context.go(Routes.opsDisputes),
+                ),
+              ],
+            ),
+            const SectionHeader(title: 'Performance'),
+            _TileGrid(
+              tiles: [
+                _Tile(
+                  key: const ValueKey('kpi-verified'),
+                  label: 'Verified jobs (of ${s.jobsTotal})',
+                  value: '${s.verifiedJobs}',
+                  icon: Icons.verified_rounded,
+                  onTap: () => context.go(Routes.opsJobs),
+                ),
+                _Tile(
+                  key: const ValueKey('kpi-pass-rate'),
+                  label: s.decidedJobs == 0
+                      ? 'Pass rate (no verdicts yet)'
+                      : 'Pass rate (${s.decidedJobs} verdicts)',
+                  value: s.passRate == null
+                      ? '—'
+                      : '${(s.passRate! * 100).round()}%',
+                  icon: Icons.donut_large_rounded,
+                  onTap: () => context.go(Routes.opsJobs),
+                ),
+                _Tile(
+                  key: const ValueKey('kpi-verdict-time'),
+                  label: 'Avg verdict time (Muse Spark + SAM 3.1)',
+                  value: s.avgVerdictMs == null
+                      ? '—'
+                      : AiAttribution.formatLatency(s.avgVerdictMs!),
+                  icon: Icons.bolt_rounded,
+                  onTap: () => context.go(Routes.opsJobs),
+                ),
+                _Tile(
+                  key: const ValueKey('kpi-payouts'),
+                  label: 'Payouts released',
+                  value: rand(s.payoutsReleasedZar),
+                  icon: Icons.payments_rounded,
+                  onTap: () => context.go(Routes.opsPayouts),
+                ),
+              ],
             ),
             const SectionHeader(title: 'The rule'),
             const Callout(
@@ -103,8 +123,32 @@ class OpsOverviewScreen extends ConsumerWidget {
   }
 }
 
+class _TileGrid extends StatelessWidget {
+  const _TileGrid({required this.tiles});
+
+  final List<Widget> tiles;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, c) {
+      final columns = c.maxWidth >= 900
+          ? 4
+          : c.maxWidth >= 520
+          ? 2
+          : 1;
+      final width = (c.maxWidth - Gap.md * (columns - 1)) / columns;
+      return Wrap(
+        spacing: Gap.md,
+        runSpacing: Gap.md,
+        children: [for (final t in tiles) SizedBox(width: width, child: t)],
+      );
+    },
+  );
+}
+
 class _Tile extends StatelessWidget {
   const _Tile({
+    super.key,
     required this.label,
     required this.value,
     required this.icon,

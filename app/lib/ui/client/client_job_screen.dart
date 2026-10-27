@@ -136,10 +136,11 @@ class _DepositPanelState extends ConsumerState<_DepositPanel> {
   bool _paying = false;
 
   Future<void> _pay() async {
+    final container = ProviderScope.containerOf(context, listen: false);
     setState(() => _paying = true);
     try {
-      await ref.read(apiProvider).payDeposit(widget.job.id);
-      ref.refreshJob(widget.job.id);
+      await container.read(apiProvider).payDeposit(widget.job.id);
+      refreshJobIn(container, widget.job.id);
       if (mounted) {
         showSnack(context, 'Deposit paid (mock). Your slot is held.');
       }

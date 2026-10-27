@@ -26,10 +26,11 @@ class _BarberJobScreenState extends ConsumerState<BarberJobScreen> {
   bool _busy = false;
 
   Future<void> _confirm() async {
+    final container = ProviderScope.containerOf(context, listen: false);
     setState(() => _busy = true);
     try {
-      await ref.read(apiProvider).confirmJob(widget.jobId);
-      ref.refreshJob(widget.jobId);
+      await container.read(apiProvider).confirmJob(widget.jobId);
+      refreshJobIn(container, widget.jobId);
       if (mounted) {
         showSnack(context, 'Job confirmed. The client has been told.');
       }
@@ -41,8 +42,9 @@ class _BarberJobScreenState extends ConsumerState<BarberJobScreen> {
   }
 
   Future<void> _capture({required bool after}) async {
+    final container = ProviderScope.containerOf(context, listen: false);
     await context.push<bool>(Routes.proof(widget.jobId, after: after));
-    ref.refreshJob(widget.jobId);
+    refreshJobIn(container, widget.jobId);
   }
 
   @override

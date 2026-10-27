@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Literal
 
 from sqlalchemy import select
@@ -34,6 +35,7 @@ async def open_dispute(
         raise conflict("This job already has an open dispute")
     if not audio and not (text and text.strip()):
         raise validation("Send a voice note (audio) or text")
+    started = time.perf_counter()
     transcript = ""
     versions: dict[str, str] = {"spark": models.versions["spark"]}
     if audio:
@@ -71,6 +73,7 @@ async def open_dispute(
         else None,
         payment_status_before=job.payment_status,
         model_versions=versions,
+        elapsed_ms=int((time.perf_counter() - started) * 1000),
     )
     db.add(dispute)
     notify(

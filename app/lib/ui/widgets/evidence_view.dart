@@ -1,21 +1,24 @@
 import 'package:fade_call/core/format.dart';
 import 'package:fade_call/core/theme.dart';
 import 'package:fade_call/data/models/models.dart';
+import 'package:fade_call/ui/widgets/ai_attribution.dart';
 import 'package:fade_call/ui/widgets/badges.dart';
 import 'package:fade_call/ui/widgets/check_row.dart';
 import 'package:fade_call/ui/widgets/common.dart';
+import 'package:fade_call/ui/widgets/compare_slider.dart';
 import 'package:fade_call/ui/widgets/signed_image.dart';
 import 'package:flutter/material.dart';
 
 /// Proof-of-job evidence: verdict banner, before/after photos with SAM hair
-/// masks, and every check with the model's reason. Shared by barber, client
-/// and operator views.
+/// masks (side by side or a drag-to-compare slider, tap for fullscreen), and
+/// every check with the model's reason. Shared by barber, client and operator.
 class EvidenceView extends StatefulWidget {
   const EvidenceView({
     required this.evidence,
     super.key,
     this.onExpired,
     this.showBanner = true,
+    this.compareByDefault = false,
   });
 
   final Evidence evidence;
@@ -24,14 +27,44 @@ class EvidenceView extends StatefulWidget {
   final VoidCallback? onExpired;
   final bool showBanner;
 
+  /// Start in the compare-slider layout (operator review).
+  final bool compareByDefault;
+
   @override
   State<EvidenceView> createState() => _EvidenceViewState();
 }
 
 enum _PhotoMode { mask, photo }
 
+/// Which model produced each check's judgement.
+MetaModel? checkModel(CheckKind kind) => switch (kind) {
+  CheckKind.samePerson || CheckKind.cutMatch => MetaModel.spark,
+  CheckKind.hairChanged => MetaModel.sam,
+  _ => null,
+};
+
 class _EvidenceViewState extends State<EvidenceView> {
   _PhotoMode _mode = _PhotoMode.mask;
+  late bool _compare = widget.compareByDefault;
+
+  void _openFullscreen(int initial) {
+    final e = widget.evidence;
+    final images = <ViewerImage>[
+      if (e.beforeOverlayUrl != null)
+        (label: 'Before · hair mask', url: e.beforeOverlayUrl),
+      if (e.afterOverlayUrl != null)
+        (label: 'After · hair mask', url: e.afterOverlayUrl),
+      if (e.beforeUrl != null) (label: 'Before', url: e.beforeUrl),
+      if (e.afterUrl != null) (label: 'After', url: e.afterUrl),
+    ];
+    if (images.isEmpty) return;
+    showFullscreenImages(
+      context,
+      images: images,
+      initial: initial.clamp(0, images.length - 1),
+      onExpired: widget.onExpired,
+    ).ignore();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,8 +73,13 @@ class _EvidenceViewState extends State<EvidenceView> {
         !e.isPurged &&
         (e.beforeOverlayUrl != null || e.afterOverlayUrl != null);
     final mode = hasMasks ? _mode : _PhotoMode.photo;
-    final before = mode == _PhotoMode.mask ? e.beforeOverlayUrl : e.beforeUrl;
-    final after = mode == _PhotoMode.mask ? e.afterOverlayUrl : e.afterUrl;
+    final masked = mode == _PhotoMode.mask;
+    final before = masked ? e.beforeOverlayUrl : e.beforeUrl;
+    final after = masked ? e.afterOverlayUrl : e.afterUrl;
+    final canCompare = before != null && after != null;
+    // Index into the fullscreen list: masks first (when present), then photos.
+    final maskCount = [e.beforeOverlayUrl, e.afterOverlayUrl].nonNulls.length;
+    final base = masked ? 0 : maskCount;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -54,32 +92,51 @@ class _EvidenceViewState extends State<EvidenceView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
+              Wrap(
+                spacing: Gap.sm,
+                runSpacing: Gap.sm,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Expanded(
-                    child: Text('Evidence', style: context.text.titleMedium),
+                  Text('Evidence', style: context.text.titleMedium),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (canCompare && !e.isPurged)
+                        IconButton(
+                          key: const ValueKey('evidence-layout'),
+                          tooltip: _compare ? 'Side by side' : 'Compare slider',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => setState(() => _compare = !_compare),
+                          icon: Icon(
+                            _compare
+                                ? Icons.view_column_rounded
+                                : Icons.compare_rounded,
+                          ),
+                        ),
+                      if (hasMasks)
+                        SegmentedButton<_PhotoMode>(
+                          showSelectedIcon: false,
+                          style: const ButtonStyle(
+                            visualDensity: VisualDensity.compact,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          segments: const [
+                            ButtonSegment(
+                              value: _PhotoMode.mask,
+                              label: Text('Hair mask'),
+                            ),
+                            ButtonSegment(
+                              value: _PhotoMode.photo,
+                              label: Text('Photo'),
+                            ),
+                          ],
+                          selected: {mode},
+                          onSelectionChanged: (s) =>
+                              setState(() => _mode = s.first),
+                        ),
+                    ],
                   ),
-                  if (hasMasks)
-                    SegmentedButton<_PhotoMode>(
-                      showSelectedIcon: false,
-                      style: const ButtonStyle(
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      segments: const [
-                        ButtonSegment(
-                          value: _PhotoMode.mask,
-                          label: Text('Hair mask'),
-                        ),
-                        ButtonSegment(
-                          value: _PhotoMode.photo,
-                          label: Text('Photo'),
-                        ),
-                      ],
-                      selected: {mode},
-                      onSelectionChanged: (s) =>
-                          setState(() => _mode = s.first),
-                    ),
                 ],
               ),
               const SizedBox(height: Gap.md),
@@ -91,47 +148,88 @@ class _EvidenceViewState extends State<EvidenceView> {
                       'Photos deleted under the retention policy on '
                       '${formatDay(e.purgedAt)}. The checks and verdict are kept.',
                 )
+              else if (_compare && canCompare)
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    child: CompareSlider(
+                      key: ValueKey('compare-$mode'),
+                      beforeUrl: before,
+                      afterUrl: after,
+                      onExpired: widget.onExpired,
+                      onOpen: () => _openFullscreen(base),
+                    ),
+                  ),
+                )
               else
                 Row(
                   children: [
                     Expanded(
-                      child: SignedImage(
-                        url: before,
-                        label: 'BEFORE',
-                        onExpired: widget.onExpired,
+                      child: GestureDetector(
+                        onTap: () => _openFullscreen(base),
+                        child: SignedImage(
+                          url: before,
+                          label: 'BEFORE',
+                          onExpired: widget.onExpired,
+                        ),
                       ),
                     ),
                     const SizedBox(width: Gap.sm + 4),
                     Expanded(
-                      child: SignedImage(
-                        url: after,
-                        label: 'AFTER',
-                        onExpired: widget.onExpired,
+                      child: GestureDetector(
+                        onTap: () => _openFullscreen(base + 1),
+                        child: SignedImage(
+                          url: after,
+                          label: 'AFTER',
+                          onExpired: widget.onExpired,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              if (mode == _PhotoMode.mask && !e.isPurged) ...[
+              if (!e.isPurged) ...[
                 const SizedBox(height: Gap.sm),
-                Text(
-                  'Tinted area is the hair region found by SAM 3.1.',
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.colors.onSurfaceVariant,
-                  ),
+                Wrap(
+                  spacing: Gap.sm,
+                  runSpacing: Gap.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (masked) ...[
+                      const ModelChip(model: MetaModel.sam),
+                      Text(
+                        'Tinted area is the hair region found by SAM 3.1.',
+                        style: context.text.bodySmall?.copyWith(
+                          color: context.colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ] else
+                      Text(
+                        _compare
+                            ? 'Drag the divider. Tap to enlarge.'
+                            : 'Tap a photo to enlarge.',
+                        style: context.text.bodySmall?.copyWith(
+                          color: context.colors.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
                 ),
               ],
               const SizedBox(height: Gap.md),
               const Divider(),
               for (final kind in CheckKind.values)
-                CheckRow(label: kind.label, check: e.checks[kind]),
+                CheckRow(
+                  label: kind.label,
+                  check: e.checks[kind],
+                  model: checkModel(kind),
+                ),
               if (e.modelVersions.isNotEmpty) ...[
                 const Divider(),
                 const SizedBox(height: Gap.sm),
-                Text(
-                  'Checked by ${e.modelVersions.values.toSet().join(' · ')}',
-                  style: context.text.labelSmall?.copyWith(
-                    color: context.colors.onSurfaceVariant,
-                  ),
+                AiAttribution.fromVersions(
+                  e.modelVersions,
+                  key: const ValueKey('evidence-attribution'),
+                  elapsedMs: e.elapsedMs,
+                  prefix: 'Checked by',
                 ),
               ],
             ],

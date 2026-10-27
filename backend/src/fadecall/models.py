@@ -95,6 +95,7 @@ class PortfolioItem(Base):
     reasons: Mapped[dict[str, Any]] = mapped_column(JSONType)
     overall: Mapped[float] = mapped_column(Float)
     model_versions: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    elapsed_ms: Mapped[int | None] = mapped_column(Integer)  # Muse Spark grading time
     created_at: Mapped[datetime] = _created()
 
     barber: Mapped[Barber] = relationship(back_populates="portfolio")
@@ -133,6 +134,17 @@ class Quote(Base):
 
 class Job(Base):
     __tablename__ = "jobs"
+    __table_args__ = (
+        # One live booking per barber per slot; mirrors 0001_init.sql.
+        Index(
+            "uq_jobs_barber_slot",
+            "barber_id",
+            "slot_start",
+            unique=True,
+            sqlite_where=text("status <> 'cancelled'"),
+            postgresql_where=text("status <> 'cancelled'"),
+        ),
+    )
 
     id: Mapped[str] = _id_col()
     quote_id: Mapped[str | None] = mapped_column(ForeignKey("quotes.id"))
@@ -188,6 +200,7 @@ class Evidence(Base):
     operator_reason: Mapped[str | None] = mapped_column(Text)
     model_versions: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
     decided_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    elapsed_ms: Mapped[int | None] = mapped_column(Integer)  # after photo in -> model verdict
     purged_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_at: Mapped[datetime] = _created()
 
@@ -207,6 +220,16 @@ class Rating(Base):
 
 class Dispute(Base):
     __tablename__ = "disputes"
+    __table_args__ = (
+        # At most one open dispute per job; mirrors 0001_init.sql.
+        Index(
+            "uq_disputes_open",
+            "job_id",
+            unique=True,
+            sqlite_where=text("outcome IS NULL"),
+            postgresql_where=text("outcome IS NULL"),
+        ),
+    )
 
     id: Mapped[str] = _id_col()
     job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"))
@@ -219,6 +242,7 @@ class Dispute(Base):
     resolution_reason: Mapped[str | None] = mapped_column(Text)
     payment_status_before: Mapped[str | None] = mapped_column(String(24))
     model_versions: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    elapsed_ms: Mapped[int | None] = mapped_column(Integer)  # transcribe + summarise time
     created_at: Mapped[datetime] = _created()
     resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 

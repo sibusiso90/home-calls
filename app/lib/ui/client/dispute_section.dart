@@ -4,6 +4,7 @@ import 'package:fade_call/data/api_exception.dart';
 import 'package:fade_call/data/models/models.dart';
 import 'package:fade_call/data/upload_file.dart';
 import 'package:fade_call/state/providers.dart';
+import 'package:fade_call/ui/widgets/ai_attribution.dart';
 import 'package:fade_call/ui/widgets/badges.dart';
 import 'package:fade_call/ui/widgets/common.dart';
 import 'package:fade_call/ui/widgets/voice_recorder_button.dart';
@@ -74,6 +75,13 @@ class DisputeSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: Gap.sm),
           Text(d.summary, style: context.text.bodyMedium),
+          const SizedBox(height: Gap.sm),
+          AiAttribution.fromVersions(
+            d.modelVersions,
+            elapsedMs: d.elapsedMs,
+            prefix: 'Summarised by',
+            fallback: const [MetaModel.transcribe, MetaModel.spark],
+          ),
           if (d.outcome case final o?) ...[
             const SizedBox(height: Gap.sm),
             Text(
@@ -126,15 +134,16 @@ class _DisputeSheetState extends ConsumerState<_DisputeSheet> {
   }
 
   Future<void> _send() async {
+    final container = ProviderScope.containerOf(context, listen: false);
     setState(() {
       _sending = true;
       _error = null;
     });
     try {
-      final d = await ref
+      final d = await container
           .read(apiProvider)
           .openDispute(widget.jobId, audio: _audio, text: _text.text.trim());
-      ref.refreshJob(widget.jobId);
+      refreshJobIn(container, widget.jobId);
       if (mounted) setState(() => _result = d);
     } on Object catch (e) {
       if (mounted) setState(() => _error = friendlyError(e));

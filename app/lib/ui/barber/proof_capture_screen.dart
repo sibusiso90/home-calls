@@ -41,6 +41,10 @@ class _ProofCaptureScreenState extends ConsumerState<ProofCaptureScreen> {
   String? _cameraError;
   bool _shooting = false;
 
+  /// True while a camera is being opened; starts are serialised so fast
+  /// switching can't leak a controller.
+  bool _cameraStarting = false;
+
   StreamSubscription<GpsFix>? _gpsSub;
   GpsFix? _fix;
   String? _gpsError;
@@ -83,16 +87,27 @@ class _ProofCaptureScreenState extends ConsumerState<ProofCaptureScreen> {
       return;
     }
     _gpsSub = location.watch().listen(
-      (fix) => setState(() {
-        _fix = fix;
-        _gpsError = null;
-      }),
-      onError: (Object _) =>
-          setState(() => _gpsError = 'Could not get a GPS fix.'),
+      (fix) {
+        if (!mounted) return;
+        setState(() {
+          _fix = fix;
+          _gpsError = null;
+        });
+      },
+      onError: (Object _) {
+        if (!mounted) return;
+        // Never keep using a position from before the error.
+        setState(() {
+          _fix = null;
+          _gpsError = 'Could not get a GPS fix.';
+        });
+      },
     );
   }
 
   Future<void> _startCamera([CameraDescription? preferred]) async {
+    if (_cameraStarting) return;
+    _cameraStarting = true;
     setState(() => _cameraError = null);
     try {
       if (_cameras.isEmpty) _cameras = await availableCameras();
@@ -111,11 +126,19 @@ class _ProofCaptureScreenState extends ConsumerState<ProofCaptureScreen> {
         ResolutionPreset.high,
         enableAudio: false,
       );
-      await controller.initialize();
+      try {
+        await controller.initialize();
+      } on Object {
+        await controller.dispose();
+        rethrow;
+      }
       if (!mounted) {
         await controller.dispose();
         return;
       }
+      // Belt and braces: nothing else may hold a live controller now.
+      final stray = _camera;
+      if (stray != null && stray != controller) await stray.dispose();
       setState(() => _camera = controller);
     } on CameraException catch (e) {
       final code = e.code.toLowerCase();
@@ -130,6 +153,9 @@ class _ProofCaptureScreenState extends ConsumerState<ProofCaptureScreen> {
       );
     } on Object {
       _cameraFailed('The camera could not start.');
+    } finally {
+      _cameraStarting = false;
+      if (mounted) setState(() {});
     }
   }
 
@@ -143,33 +169,47 @@ class _ProofCaptureScreenState extends ConsumerState<ProofCaptureScreen> {
 
   Future<void> _switchCamera() async {
     final current = _camera?.description;
-    if (_cameras.length < 2 || current == null) return;
+    if (_cameraStarting || _cameras.length < 2 || current == null) return;
     final next = _cameras[(_cameras.indexOf(current) + 1) % _cameras.length];
     await _startCamera(next);
   }
 
   // -- Capture -------------------------------------------------------------
 
-  CaptureMeta _metaNow(CaptureMode mode) {
-    final fix = _fix;
-    return CaptureMeta(
-      capturedAt: DateTime.now(),
-      mode: mode,
-      lat: fix?.lat,
-      lng: fix?.lng,
-      accuracyM: fix?.accuracyM,
-    );
+  CaptureMeta _metaAt(DateTime at, CaptureMode mode, GpsFix? fix) =>
+      CaptureMeta(
+        capturedAt: at,
+        mode: mode,
+        lat: fix?.lat,
+        lng: fix?.lng,
+        accuracyM: fix?.accuracyM,
+      );
+
+  /// A fix fresh enough to send; if the stream has gone quiet, ask once more
+  /// (briefly) rather than send an old position.
+  Future<GpsFix?> _fixForShutter(DateTime at) async {
+    final fresh = freshFix(_fix, at);
+    if (fresh != null || _gpsError != null) return fresh;
+    final location = ref.read(locationServiceProvider);
+    final fix = await location.currentFix(timeout: const Duration(seconds: 4));
+    return freshFix(fix, DateTime.now());
   }
 
   Future<void> _shoot() async {
     final camera = _camera;
     if (camera == null || _shooting) return;
     setState(() => _shooting = true);
-    // Record time and GPS at the shutter, before the (slower) encode.
-    final meta = _metaNow(CaptureMode.live);
+    // Record the time at the shutter, before the (slower) encode.
+    final at = DateTime.now();
     try {
+      // Never let GPS hold up the shutter: give up after a few seconds and
+      // send no position (the backend marks GPS uncertain).
+      final fixFuture = _fixForShutter(
+        at,
+      ).timeout(const Duration(seconds: 5), onTimeout: () => null);
       final file = await camera.takePicture();
       final bytes = await file.readAsBytes();
+      final fix = await fixFuture;
       if (!mounted) return;
       setState(() {
         _photo = UploadFile(
@@ -177,7 +217,7 @@ class _ProofCaptureScreenState extends ConsumerState<ProofCaptureScreen> {
           filename: '$_phaseName.jpg',
           mimeType: 'image/jpeg',
         );
-        _meta = meta;
+        _meta = _metaAt(at, CaptureMode.live, fix);
         _phase = _Phase.review;
       });
     } on Object {
@@ -192,9 +232,10 @@ class _ProofCaptureScreenState extends ConsumerState<ProofCaptureScreen> {
         .read(mediaPickerProvider)
         .pickImage(name: _phaseName);
     if (file == null || !mounted) return;
+    final now = DateTime.now();
     setState(() {
       _photo = file;
-      _meta = _metaNow(CaptureMode.uploadFallback);
+      _meta = _metaAt(now, CaptureMode.uploadFallback, freshFix(_fix, now));
       _phase = _Phase.review;
     });
   }
@@ -212,12 +253,15 @@ class _ProofCaptureScreenState extends ConsumerState<ProofCaptureScreen> {
   Future<void> _upload() async {
     final (photo, meta) = (_photo, _meta);
     if (photo == null || meta == null) return;
+    // Capture before the long await: the barber may close the screen while
+    // the job is verifying, and the job must still be refreshed.
+    final container = ProviderScope.containerOf(context, listen: false);
     setState(() {
       _phase = _Phase.uploading;
       _uploadError = null;
     });
     try {
-      final evidence = await ref
+      final evidence = await container
           .read(apiProvider)
           .uploadProof(
             jobId: widget.jobId,
@@ -225,7 +269,7 @@ class _ProofCaptureScreenState extends ConsumerState<ProofCaptureScreen> {
             photo: photo,
             meta: meta,
           );
-      ref.refreshJob(widget.jobId);
+      refreshJobIn(container, widget.jobId);
       if (!mounted) return;
       setState(() {
         _evidence = evidence;
@@ -239,7 +283,7 @@ class _ProofCaptureScreenState extends ConsumerState<ProofCaptureScreen> {
       if (e case ApiException(isConflict: true, :final message)) {
         // e.g. "Deposit not paid yet" or "This job is already being
         // verified": not a failure of the photo. Refresh the job and go back.
-        ref.refreshJob(widget.jobId);
+        refreshJobIn(container, widget.jobId);
         if (!mounted) return;
         showSnack(context, message);
         Navigator.of(context).pop(false);
@@ -322,8 +366,12 @@ class _ProofCaptureScreenState extends ConsumerState<ProofCaptureScreen> {
                 bottom: Gap.md,
                 child: _Hud(
                   now: _now,
-                  fix: _fix,
-                  gpsError: _gpsError,
+                  fix: freshFix(_fix, _now),
+                  gpsError:
+                      _gpsError ??
+                      (_fix != null && freshFix(_fix, _now) == null
+                          ? 'GPS fix is out of date; waiting for a new one'
+                          : null),
                   phase: _phaseName,
                 ),
               ),
@@ -562,7 +610,10 @@ class _Hud extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
+            Wrap(
+              spacing: Gap.sm,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 DecoratedBox(
                   decoration: BoxDecoration(
@@ -585,7 +636,6 @@ class _Hud extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: Gap.sm),
                 Text(
                   '${phase.toUpperCase()} PHOTO',
                   style: context.text.labelMedium?.copyWith(
@@ -605,7 +655,12 @@ class _Hud extends StatelessWidget {
                   color: Palette.cream,
                 ),
                 const SizedBox(width: 6),
-                Text('${formatDay(now)}  ${formatClock(now)}', style: mono),
+                Flexible(
+                  child: Text(
+                    '${formatDay(now)}  ${formatClock(now)}',
+                    style: mono,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 4),

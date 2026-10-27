@@ -7,6 +7,7 @@ import 'package:fade_call/data/upload_file.dart';
 import 'package:fade_call/router.dart';
 import 'package:fade_call/state/providers.dart';
 import 'package:fade_call/state/quote_state.dart';
+import 'package:fade_call/ui/widgets/ai_attribution.dart';
 import 'package:fade_call/ui/widgets/common.dart';
 import 'package:fade_call/ui/widgets/consent_gate.dart';
 import 'package:fade_call/ui/widgets/fade_app_bar.dart';
@@ -400,13 +401,16 @@ class _QuoteResultState extends ConsumerState<_QuoteResult> {
                       icon: Icons.timer_outlined,
                       text: '${q.minutes} min',
                     ),
-                    if (q.elapsedMs != null)
-                      _DarkChip(
-                        icon: Icons.bolt_rounded,
-                        text:
-                            'Quoted in ${(q.elapsedMs! / 1000).toStringAsFixed(1)} s',
-                      ),
                   ],
+                ),
+                const SizedBox(height: Gap.md),
+                AiAttribution.fromVersions(
+                  q.modelVersions,
+                  key: const ValueKey('quote-attribution'),
+                  elapsedMs: q.elapsedMs,
+                  dark: true,
+                  prefix: 'Named and timed by',
+                  fallback: const [MetaModel.spark, MetaModel.sam],
                 ),
               ],
             ),
@@ -419,7 +423,10 @@ class _QuoteResultState extends ConsumerState<_QuoteResult> {
             const SizedBox(height: Gap.sm),
           ],
         ],
-        const SectionHeader(title: 'Why this cut'),
+        const SectionHeader(
+          title: 'Why this cut',
+          trailing: ModelChip(model: MetaModel.spark),
+        ),
         Panel(child: Text(q.reasons, style: context.text.bodyMedium)),
         SectionHeader(
           title: 'Hair found in your photos',
@@ -450,11 +457,19 @@ class _QuoteResultState extends ConsumerState<_QuoteResult> {
         if (_masks)
           Padding(
             padding: const EdgeInsets.only(top: Gap.sm),
-            child: Text(
-              'Tinted area is the hair region found by SAM 3.1.',
-              style: context.text.bodySmall?.copyWith(
-                color: context.colors.onSurfaceVariant,
-              ),
+            child: Wrap(
+              spacing: Gap.sm,
+              runSpacing: Gap.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const ModelChip(model: MetaModel.sam),
+                Text(
+                  'Tinted area is the hair region found by SAM 3.1.',
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           ),
         const SizedBox(height: Gap.lg),

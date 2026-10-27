@@ -74,10 +74,15 @@ abstract interface class FadeCallApi {
 
   // Operator
   Future<OpsSummary> opsSummary();
-  Future<List<Barber>> opsBarbers({String status = 'pending_approval'});
+
+  /// `status: null` lists every barber.
+  Future<List<Barber>> opsBarbers({String? status = 'pending_approval'});
+  Future<BarberDetail> opsBarber(String id);
   Future<void> approveBarber(String id, {required String reason});
   Future<void> rejectBarber(String id, {required String reason});
-  Future<List<Job>> opsJobs({String status = 'needs_review'});
+
+  /// `status: null` lists every job.
+  Future<List<Job>> opsJobs({String? status = 'needs_review'});
   Future<void> opsVerdict(
     String jobId, {
     required bool pass,

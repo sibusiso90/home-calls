@@ -22,7 +22,9 @@ class SignedImage extends ConsumerWidget {
 
   final String? url;
   final VoidCallback? onExpired;
-  final double aspectRatio;
+
+  /// Null fills the parent instead of forcing a ratio.
+  final double? aspectRatio;
   final BoxFit fit;
   final double radius;
   final String? label;
@@ -71,19 +73,19 @@ class SignedImage extends ConsumerWidget {
       );
     }
 
+    final stack = Stack(
+      fit: StackFit.expand,
+      children: [
+        image,
+        if (label != null)
+          Positioned(left: Gap.sm, top: Gap.sm, child: _ImageLabel(label!)),
+      ],
+    );
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
-      child: AspectRatio(
-        aspectRatio: aspectRatio,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            image,
-            if (label != null)
-              Positioned(left: Gap.sm, top: Gap.sm, child: _ImageLabel(label!)),
-          ],
-        ),
-      ),
+      child: aspectRatio == null
+          ? stack
+          : AspectRatio(aspectRatio: aspectRatio!, child: stack),
     );
   }
 }

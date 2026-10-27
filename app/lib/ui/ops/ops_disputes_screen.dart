@@ -4,6 +4,7 @@ import 'package:fade_call/data/api_exception.dart';
 import 'package:fade_call/data/models/models.dart';
 import 'package:fade_call/state/providers.dart';
 import 'package:fade_call/ui/ops/ops_common.dart';
+import 'package:fade_call/ui/widgets/ai_attribution.dart';
 import 'package:fade_call/ui/widgets/badges.dart';
 import 'package:fade_call/ui/widgets/common.dart';
 import 'package:fade_call/ui/widgets/evidence_view.dart';
@@ -71,12 +72,13 @@ class _DisputeCardState extends ConsumerState<_DisputeCard> {
       hint: 'Reason, shared with both sides',
     );
     if (reason == null || !mounted) return;
+    final container = ProviderScope.containerOf(context, listen: false);
     setState(() => _busy = true);
     try {
-      await ref
+      await container
           .read(apiProvider)
           .resolveDispute(widget.dispute.id, outcome: _outcome, reason: reason);
-      refreshOps(ref);
+      refreshOpsIn(container);
       if (mounted) showSnack(context, 'Dispute resolved.');
     } on Object catch (e) {
       if (mounted) showSnack(context, friendlyError(e));
@@ -126,6 +128,14 @@ class _DisputeCardState extends ConsumerState<_DisputeCard> {
           ],
           const SectionHeader(title: 'Case summary'),
           Text(d.summary, style: context.text.bodyLarge),
+          const SizedBox(height: Gap.sm),
+          AiAttribution.fromVersions(
+            d.modelVersions,
+            key: const ValueKey('dispute-attribution'),
+            elapsedMs: d.elapsedMs,
+            prefix: 'Summarised by',
+            fallback: const [MetaModel.transcribe, MetaModel.spark],
+          ),
           if ((d.clientClaim ?? '').isNotEmpty) ...[
             const SectionHeader(title: 'Client says'),
             Text(d.clientClaim!, style: context.text.bodyMedium),

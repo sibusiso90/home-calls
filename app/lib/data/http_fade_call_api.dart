@@ -30,7 +30,9 @@ final class HttpFadeCallApi implements FadeCallApi {
     final resolved = _base.resolve(
       path.startsWith('/') ? path.substring(1) : path,
     );
-    return query == null ? resolved : resolved.replace(queryParameters: query);
+    return query == null || query.isEmpty
+        ? resolved
+        : resolved.replace(queryParameters: query);
   }
 
   Map<String, String> _headers({bool json = false}) => {
@@ -372,8 +374,15 @@ final class HttpFadeCallApi implements FadeCallApi {
       OpsSummary.fromJson(_obj(await _get('/ops/summary')));
 
   @override
-  Future<List<Barber>> opsBarbers({String status = 'pending_approval'}) async =>
-      _list(await _get('/ops/barbers', {'status': status}), Barber.fromJson);
+  Future<List<Barber>> opsBarbers({
+    String? status = 'pending_approval',
+  }) async =>
+      _list(await _get('/ops/barbers', {'status': ?status}), Barber.fromJson);
+
+  @override
+  Future<BarberDetail> opsBarber(String id) async => BarberDetail.fromJson(
+    _obj(await _get('/ops/barbers/${Uri.encodeComponent(id)}')),
+  );
 
   @override
   Future<void> approveBarber(String id, {required String reason}) => _post(
@@ -388,8 +397,8 @@ final class HttpFadeCallApi implements FadeCallApi {
   );
 
   @override
-  Future<List<Job>> opsJobs({String status = 'needs_review'}) async =>
-      _list(await _get('/ops/jobs', {'status': status}), Job.fromJson);
+  Future<List<Job>> opsJobs({String? status = 'needs_review'}) async =>
+      _list(await _get('/ops/jobs', {'status': ?status}), Job.fromJson);
 
   @override
   Future<void> opsVerdict(

@@ -2,6 +2,8 @@
 
 uv run python -m fadecall.seed            # only if the DB is empty
 uv run python -m fadecall.seed --reset    # wipe and reseed
+uv run python -m fadecall.seed --demo [--lat -25.99 --lng 28.12] [--slot 14:30]
+    # wipe, reseed, then add the film-day set (see docs/demo-script.md)
 """
 
 from __future__ import annotations
@@ -118,6 +120,7 @@ async def _barber(
     spec: tuple,
     status: str,
     idx: int,  # type: ignore[type-arg]
+    items: int = 5,
 ) -> Barber:
     name, phone, area, years, styles, langs, avail, target = spec[:8]
     user = User(role="barber", name=name, phone=phone, phone_key=phone_key(phone, name))
@@ -136,7 +139,7 @@ async def _barber(
     )
     db.add(b)
     db.flush()
-    for i in range(5):
+    for i in range(items):
         skin = SKIN_TONES[(idx + i) % len(SKIN_TONES)]
         scores = _scores(target, i)
         reasons = {
@@ -162,6 +165,9 @@ async def _barber(
         )
     db.flush()
     db.refresh(b)
+    if items < 5:  # still onboarding: not graded yet
+        db.commit()
+        return b
     avg = round(mean(p.overall for p in b.portfolio), 1)
     b.tier = tier_for_average(avg)
     b.price_min_zar, b.price_max_zar = PRICE_BANDS[b.tier]
@@ -211,7 +217,7 @@ async def _run_job(
     return job.id
 
 
-async def seed(settings: Settings, reset: bool = False) -> None:
+async def seed(settings: Settings, reset: bool = False, quiet: bool = False) -> None:
     if reset:
         _reset(settings)
     engine = make_engine(settings.sqlalchemy_url)
@@ -285,6 +291,8 @@ async def seed(settings: Settings, reset: bool = False) -> None:
         db.commit()
     await storage.aclose()
     engine.dispose()
+    if quiet:
+        return
     tomorrow = next(candidate_slots(utcnow())).astimezone(SAST)
     print("Seeded Fade Call demo data (mock models, synthetic images).")
     print(f"  operator: name any, passcode = OPERATOR_PASSCODE ({settings.operator_passcode})")
@@ -295,11 +303,172 @@ async def seed(settings: Settings, reset: bool = False) -> None:
     print(f"  next bookable slot: {tomorrow.isoformat()}")
 
 
+# --- film-day set ---------------------------------------------------------------
+
+DEMO_FRESH_BARBER = ("Ayanda K", "+27825550101")
+DEMO_ONBOARDING_BARBER = (
+    "Bongani S",
+    "+27825550102",
+    "midrand-central",
+    5,
+    ["skin fade", "taper"],
+    ["isiZulu", "English"],
+    "Weekdays after 15:00",
+    7.6,
+)
+DEMO_CLIENT = {"name": "Naledi", "phone": "+27845550103", "area_id": "midrand-central"}
+DEMO_ADDRESS = "7 Demo Close, Midrand"
+
+
+def demo_slot(now: datetime, at: str | None = None) -> datetime:
+    """Today's demo slot: `at` (HH:MM, SAST) or 10 minutes before now, rounded to 5 min.
+
+    The timestamp check passes from 30 min before the slot to 3 hours after it,
+    so filming can start straight away and run for about three hours.
+    """
+    local = now.astimezone(SAST)
+    if at:
+        hh, mm = (int(x) for x in at.split(":"))
+        return local.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    start = local - timedelta(minutes=10)
+    return start.replace(minute=start.minute - start.minute % 5, second=0, microsecond=0)
+
+
+async def seed_demo(
+    settings: Settings,
+    *,
+    lat: float | None = None,
+    lng: float | None = None,
+    slot_at: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, str]:
+    """Reset, run the normal seed, then add the film-day records. Returns ids for printing."""
+    await seed(settings, reset=True, quiet=True)
+    now = now or utcnow()
+    engine = make_engine(settings.sqlalchemy_url)
+    storage = make_storage(settings)
+    models = MockModelClient(settings.model_copy(update={"mock_force_review": False}))
+    out: dict[str, str] = {}
+    try:
+        with make_sessionmaker(engine)() as db:
+            # 1) a brand-new barber for the voice-note shot
+            name, phone = DEMO_FRESH_BARBER
+            user = User(role="barber", name=name, phone=phone, phone_key=phone_key(phone, name))
+            db.add(user)
+            db.flush()
+            db.add(Barber(user_id=user.id, name=name, status="onboarding"))
+            # 2) a barber with a confirmed profile and 4 of 5 pairs: add one, then grade
+            await _barber(db, storage, DEMO_ONBOARDING_BARBER, "onboarding", 7, items=4)
+
+            # 3) a fresh client with a quote ready, booked with Thabo for "today"
+            cu = User(
+                role="client",
+                name=DEMO_CLIENT["name"],
+                phone=DEMO_CLIENT["phone"],
+                phone_key=phone_key(DEMO_CLIENT["phone"], DEMO_CLIENT["name"]),
+            )
+            db.add(cu)
+            db.flush()
+            client = Client(
+                user_id=cu.id,
+                name=cu.name,
+                phone=cu.phone,
+                area_id=DEMO_CLIENT["area_id"],
+            )
+            db.add(client)
+            db.commit()
+            quote = await create_quote(
+                db,
+                models,
+                storage,
+                client,
+                DEMO_CLIENT["area_id"],
+                head_image(SKIN_TONES[2], "full", 31),
+                head_image(SKIN_TONES[0], "fade", 32),
+            )
+            thabo = db.scalar(select(Barber).where(Barber.name == BARBERS[0][0]))
+            assert thabo is not None
+            area = AREAS_BY_ID[DEMO_CLIENT["area_id"]]
+            slot = demo_slot(now, slot_at)
+            job = book_job(
+                db,
+                client,
+                quote_id=quote.id,
+                barber_id=thabo.id,
+                slot_start=slot,
+                address=DEMO_ADDRESS,
+                lat=area.lat if lat is None else lat,
+                lng=area.lng if lng is None else lng,
+            )
+            job.status, job.payment_status = "confirmed", "deposit_paid"
+            job.consented_demo = True
+            db.commit()
+            out = {
+                "quote_id": quote.id,
+                "job_id": job.id,
+                "slot": slot.isoformat(),
+                "lat": f"{job.lat:.5f}",
+                "lng": f"{job.lng:.5f}",
+            }
+    finally:
+        await storage.aclose()
+        engine.dispose()
+    return out
+
+
+def print_demo(settings: Settings, ids: dict[str, str]) -> None:
+    slot = datetime.fromisoformat(ids["slot"])
+    window = f"{(slot - timedelta(minutes=30)):%H:%M}–{(slot + timedelta(hours=3)):%H:%M}"
+    rows = [
+        ("1 Voice onboarding", "barber", f"{DEMO_FRESH_BARBER[0]} {DEMO_FRESH_BARBER[1]}"),
+        (
+            "1 Portfolio + grade",
+            "barber",
+            f"{DEMO_ONBOARDING_BARBER[0]} {DEMO_ONBOARDING_BARBER[1]} (4 of 5 pairs)",
+        ),
+        ("2 Quote", "client", f"{DEMO_CLIENT['name']} {DEMO_CLIENT['phone']}"),
+        (
+            "3 Matches (ready)",
+            "client",
+            f"{DEMO_CLIENT['name']}: #/client/quote/matches/{ids['quote_id']}",
+        ),
+        (
+            "4 Proof of job (live)",
+            "barber",
+            f"{BARBERS[0][0]} {BARBERS[0][1]}: #/barber/jobs/{ids['job_id']}",
+        ),
+        (
+            "4 Rating unlocked",
+            "client",
+            f"{DEMO_CLIENT['name']}: #/client/bookings/{ids['job_id']}",
+        ),
+        ("4 Dispute / history", "client", f"{CLIENT['name']} {CLIENT['phone']}"),
+        ("5 Operator", "operator", f"any name, passcode {settings.operator_passcode}"),
+    ]
+    print("Film-day data ready (mock models, synthetic images).")
+    print(f"  Today's job: slot {slot:%H:%M} SAST; live photos pass the time check {window}.")
+    print(
+        f"  Booking GPS: {ids['lat']}, {ids['lng']} (pass within 300 m). "
+        "Re-run with --lat/--lng where you film."
+    )
+    for shot, role, login in rows:
+        print(f"  {shot:<22} {role:<9} {login}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reset", action="store_true", help="drop all data first")
+    parser.add_argument("--demo", action="store_true", help="reset + film-day dataset")
+    parser.add_argument("--lat", type=float, help="demo booking latitude (where you film)")
+    parser.add_argument("--lng", type=float, help="demo booking longitude")
+    parser.add_argument("--slot", help="demo slot today, HH:MM SAST (default: about now)")
     args = parser.parse_args()
-    asyncio.run(seed(get_settings(), reset=args.reset))
+    settings = get_settings()
+    if args.demo:
+        ids = asyncio.run(seed_demo(settings, lat=args.lat, lng=args.lng, slot_at=args.slot))
+        print_demo(settings, ids)
+    else:
+        asyncio.run(seed(settings, reset=args.reset))
 
 
 if __name__ == "__main__":

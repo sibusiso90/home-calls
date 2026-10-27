@@ -65,7 +65,9 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
     return (AudioEncoder.wav, 'audio/wav');
   }
 
-  Future<void> _start() async {
+  /// Starts recording. With [fromHold], releasing the button while the
+  /// permission prompt is up cancels instead of leaving the mic recording.
+  Future<void> _start({bool fromHold = false}) async {
     if (_recording || _busy || !widget.enabled) return;
     setState(() {
       _busy = true;
@@ -73,52 +75,65 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
     });
     try {
       final r = _recorder ??= AudioRecorder();
-      if (!await r.hasPermission()) {
-        throw const _MicDenied();
-      }
+      if (!await r.hasPermission()) throw const _MicDenied();
+      if (!mounted) return;
       final (encoder, mime) = await _pickEncoder(r);
+      if (!mounted) return;
       _mime = mime;
       await r.start(
         RecordConfig(encoder: encoder, numChannels: 1, echoCancel: true),
         path: '',
       );
+      if (!mounted || (fromHold && !_heldDown)) {
+        // Disposed, or the finger came off during the prompt: discard.
+        await r.cancel();
+        return;
+      }
       _watch
         ..reset()
         ..start();
       _ticker = Timer.periodic(const Duration(milliseconds: 200), (_) {
+        if (!mounted) return;
         if (_watch.elapsed >= widget.maxDuration) {
           unawaited(_stop());
         } else {
           setState(() {});
         }
       });
-      _levels = r
-          .onAmplitudeChanged(const Duration(milliseconds: 120))
-          .listen(
-            (a) => setState(() => _level = ((a.current + 50) / 50).clamp(0, 1)),
-          );
+      _levels = r.onAmplitudeChanged(const Duration(milliseconds: 120)).listen((
+        a,
+      ) {
+        if (mounted) {
+          setState(() => _level = ((a.current + 50) / 50).clamp(0, 1));
+        }
+      });
       unawaited(_pulse.repeat(reverse: true));
       setState(() => _recording = true);
     } on _MicDenied {
-      setState(
-        () => _error =
-            'Microphone access was blocked. Allow it in your browser settings and try again.',
+      _fail(
+        'Microphone access was blocked. Allow it in your browser settings and try again.',
       );
     } on Object {
-      setState(() => _error = "We couldn't start recording on this device.");
+      _fail("We couldn't start recording on this device.");
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
+  void _fail(String message) {
+    if (mounted) setState(() => _error = message);
+  }
+
   Future<void> _stop() async {
     if (!_recording) return;
     _ticker?.cancel();
+    _ticker = null;
     await _levels?.cancel();
     _levels = null;
     _pulse.stop();
     _watch.stop();
     final length = _watch.elapsed;
+    if (!mounted) return;
     setState(() {
       _recording = false;
       _busy = true;
@@ -127,13 +142,13 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
       final path = await _recorder?.stop();
       if (path == null) throw StateError('No audio');
       if (length < const Duration(seconds: 1)) {
-        setState(
-          () => _error =
-              'That was very short. Hold or tap again and speak for a bit longer.',
+        _fail(
+          'That was very short. Hold or tap again and speak for a bit longer.',
         );
         return;
       }
       final bytes = await XFile(path).readAsBytes();
+      if (!mounted) return;
       final ext = switch (_mime) {
         'audio/mp4' => 'm4a',
         'audio/wav' => 'wav',
@@ -144,9 +159,7 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
         length,
       );
     } on Object {
-      setState(
-        () => _error = "We couldn't save that recording. Please try again.",
-      );
+      _fail("We couldn't save that recording. Please try again.");
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -167,15 +180,16 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
           onLongPressStart: enabled
               ? (_) {
                   _heldDown = true;
-                  unawaited(_start());
+                  unawaited(_start(fromHold: true));
                 }
               : null,
-          onLongPressEnd: enabled
-              ? (_) {
-                  if (_heldDown) unawaited(_stop());
-                  _heldDown = false;
-                }
-              : null,
+          // Always attached: the release may come while a start is still
+          // waiting on the permission prompt (when the button is busy).
+          onLongPressEnd: (_) {
+            final wasHeld = _heldDown;
+            _heldDown = false;
+            if (wasHeld && _recording) unawaited(_stop());
+          },
           child: AnimatedBuilder(
             animation: _pulse,
             builder: (context, child) => DecoratedBox(

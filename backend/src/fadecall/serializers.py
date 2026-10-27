@@ -35,6 +35,7 @@ def portfolio_json(p: PortfolioItem, s: UrlSigner) -> dict[str, Any]:
         "reasons": p.reasons,
         "overall": p.overall,
         "model_versions": p.model_versions,
+        "elapsed_ms": p.elapsed_ms,
     }
 
 
@@ -116,6 +117,7 @@ def evidence_json(e: Evidence, s: UrlSigner) -> dict[str, Any]:
         "decided_by": e.decided_by,
         "operator_reason": e.operator_reason,
         "model_versions": e.model_versions,
+        "elapsed_ms": e.elapsed_ms,
         "purged_at": iso(e.purged_at),
     }
 
@@ -133,6 +135,8 @@ def dispute_json(
         "suggested_outcome": d.suggested_outcome,
         "outcome": d.outcome,
         "resolution_reason": d.resolution_reason,
+        "model_versions": d.model_versions or {},
+        "elapsed_ms": d.elapsed_ms,
         "created_at": iso(d.created_at),
         "resolved_at": iso(d.resolved_at),
     }

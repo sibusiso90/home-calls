@@ -63,6 +63,7 @@ final class PortfolioItem {
     required this.reasons,
     required this.overall,
     required this.modelVersions,
+    this.elapsedMs,
   });
 
   factory PortfolioItem.fromJson(Json json) {
@@ -75,6 +76,7 @@ final class PortfolioItem {
       reasons: json.stringMap('reasons'),
       overall: json.dblOrNull('overall') ?? 0,
       modelVersions: json.stringMap('model_versions'),
+      elapsedMs: json.intOrNull('elapsed_ms'),
     );
   }
 
@@ -85,6 +87,7 @@ final class PortfolioItem {
   final Map<String, String> reasons;
   final double overall;
   final Map<String, String> modelVersions;
+  final int? elapsedMs;
 
   double? score(ScoreCriterion c) => scores[c.key];
   String? reason(ScoreCriterion c) => reasons[c.key];
@@ -220,11 +223,13 @@ final class VoiceNoteResult {
     required this.readBack,
     required this.modelVersions,
     this.cleanTranscript,
+    this.elapsedMs,
   });
 
   factory VoiceNoteResult.fromJson(Json json) => VoiceNoteResult(
     transcript: json.strOrNull('transcript') ?? '',
     cleanTranscript: json.strOrNull('clean_transcript'),
+    elapsedMs: json.intOrNull('elapsed_ms'),
     languageDetected: switch (json.strOrNull('language_detected')) {
       final l? when l.trim().isNotEmpty => l,
       _ => null,
@@ -238,6 +243,7 @@ final class VoiceNoteResult {
 
   /// A tidied version of the transcript, when the model provides one.
   final String? cleanTranscript;
+  final int? elapsedMs;
   final String? languageDetected;
   final BarberProfile profile;
   final String readBack;

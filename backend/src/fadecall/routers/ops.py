@@ -11,10 +11,11 @@ from sqlalchemy import func, select
 from ..auth import OperatorUser
 from ..deps import DB, Signer
 from ..errors import conflict, not_found, validation
-from ..models import Barber, Dispute, Job, Payout, get_by_id
+from ..models import Barber, Dispute, Evidence, Job, Payout, Rating, get_by_id
 from ..serializers import barber_json, dispute_json, job_json, payout_json
 from ..services.disputes import resolve_dispute
 from ..services.effects import apply_verdict
+from ..timeutil import iso
 
 router = APIRouter(prefix="/ops", tags=["operator"])
 
@@ -32,10 +33,17 @@ JOB_STATUSES = (
 
 
 @router.get("/summary")
-def summary(_: OperatorUser, db: DB) -> dict[str, int]:
+def summary(_: OperatorUser, db: DB) -> dict[str, Any]:
     def count(q: Any) -> int:
         return int(db.scalar(q) or 0)
 
+    decided = count(select(func.count()).select_from(Evidence).where(Evidence.verdict.is_not(None)))
+    passed = count(select(func.count()).select_from(Evidence).where(Evidence.verdict == "pass"))
+    avg_ms = db.scalar(
+        select(func.avg(Evidence.elapsed_ms)).where(
+            Evidence.elapsed_ms.is_not(None), Evidence.verdict.is_not(None)
+        )
+    )
     return {
         "barbers_pending": count(
             select(func.count()).select_from(Barber).where(Barber.status == "pending_approval")
@@ -49,6 +57,14 @@ def summary(_: OperatorUser, db: DB) -> dict[str, int]:
         "payouts_released_zar": count(
             select(func.coalesce(func.sum(Payout.amount_zar), 0)).where(Payout.status == "released")
         ),
+        # KPIs (additive)
+        "jobs_total": count(select(func.count()).select_from(Job)),
+        "verified_jobs": count(
+            select(func.count()).select_from(Job).where(Job.status == "verified")
+        ),
+        "decided_jobs": decided,
+        "pass_rate": round(passed / decided, 3) if decided else None,
+        "avg_verdict_ms": round(float(avg_ms)) if avg_ms is not None else None,
     }
 
 
@@ -62,6 +78,35 @@ def list_barbers(
             raise validation(f"status must be one of {', '.join(BARBER_STATUSES)}")
         q = q.where(Barber.status == status)
     return [barber_json(b, signer) for b in db.scalars(q)]
+
+
+@router.get("/barbers/{barber_id}")
+def barber_detail(barber_id: str, _: OperatorUser, db: DB, signer: Signer) -> dict[str, Any]:
+    """A barber with their jobs (newest first) and ratings, for the operator detail page."""
+    b = _barber(db, barber_id)
+    jobs = list(
+        db.scalars(select(Job).where(Job.barber_id == b.id).order_by(Job.slot_start.desc()))
+    )
+    ratings = db.execute(
+        select(Rating, Job)
+        .join(Job, Rating.job_id == Job.id)
+        .where(Job.barber_id == b.id)
+        .order_by(Rating.created_at.desc())
+    ).all()
+    return {
+        "barber": barber_json(b, signer),
+        "jobs": [job_json(j, signer) for j in jobs],
+        "ratings": [
+            {
+                "job_id": j.id,
+                "stars": r.stars,
+                "comment": r.comment,
+                "client_name": j.client.name,
+                "created_at": iso(r.created_at),
+            }
+            for r, j in ratings
+        ],
+    }
 
 
 class ReasonBody(BaseModel):

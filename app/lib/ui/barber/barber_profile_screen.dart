@@ -4,6 +4,7 @@ import 'package:fade_call/data/models/models.dart';
 import 'package:fade_call/state/barber_state.dart';
 import 'package:fade_call/state/providers.dart';
 import 'package:fade_call/ui/barber/onboarding_flow.dart';
+import 'package:fade_call/ui/widgets/ai_attribution.dart';
 import 'package:fade_call/ui/widgets/badges.dart';
 import 'package:fade_call/ui/widgets/common.dart';
 import 'package:fade_call/ui/widgets/fade_app_bar.dart';
@@ -99,6 +100,11 @@ class ProfileCardView extends ConsumerWidget {
                 ),
                 const SizedBox(height: Gap.sm),
                 Text(grade.summary, style: context.text.bodyMedium),
+                const SizedBox(height: Gap.sm),
+                const AiAttribution(
+                  models: [MetaModel.spark],
+                  prefix: 'From scores by',
+                ),
               ],
             ),
           ),

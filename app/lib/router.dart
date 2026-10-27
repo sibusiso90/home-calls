@@ -10,11 +10,12 @@ import 'package:fade_call/ui/client/bookings_screen.dart';
 import 'package:fade_call/ui/client/client_job_screen.dart';
 import 'package:fade_call/ui/client/matches_screen.dart';
 import 'package:fade_call/ui/client/quote_screen.dart';
+import 'package:fade_call/ui/ops/ops_barber_screen.dart';
 import 'package:fade_call/ui/ops/ops_barbers_screen.dart';
 import 'package:fade_call/ui/ops/ops_disputes_screen.dart';
+import 'package:fade_call/ui/ops/ops_jobs_screen.dart';
 import 'package:fade_call/ui/ops/ops_overview_screen.dart';
 import 'package:fade_call/ui/ops/ops_payouts_screen.dart';
-import 'package:fade_call/ui/ops/ops_reviews_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,7 +29,7 @@ abstract final class Routes {
   static const clientBookings = '/client/bookings';
   static const opsOverview = '/ops/overview';
   static const opsBarbers = '/ops/barbers';
-  static const opsReviews = '/ops/reviews';
+  static const opsJobs = '/ops/jobs';
   static const opsDisputes = '/ops/disputes';
   static const opsPayouts = '/ops/payouts';
 
@@ -38,6 +39,9 @@ abstract final class Routes {
   static String matches(String quoteId) => '$clientQuote/matches/$quoteId';
   static String clientJob(String id, {bool confirmed = false}) =>
       '$clientBookings/$id${confirmed ? '?confirmed=1' : ''}';
+
+  static String opsJob(String id) => '$opsJobs/$id';
+  static String opsBarber(String id) => '$opsBarbers/$id';
 
   static String homeFor(Role role) => switch (role) {
     Role.barber => barberJobs,
@@ -51,11 +55,26 @@ abstract final class Routes {
     Role.operator => '/ops',
   };
 
-  /// Role-based redirect: signed-out users go to login, and each role is
-  /// kept inside its own section.
-  static String? redirect({required Role? role, required String location}) {
-    if (role == null) return location == login ? null : login;
+  /// Role-based redirect: signed-out users go to login (remembering where
+  /// they were headed in `?from=`), and each role is kept inside its own
+  /// section. After sign-in, a `from` inside the role's section wins.
+  static String? redirect({
+    required Role? role,
+    required String location,
+    Uri? uri,
+  }) {
+    if (role == null) {
+      if (location == login) return null;
+      final target = uri?.toString() ?? location;
+      return target == '/'
+          ? login
+          : '$login?from=${Uri.encodeComponent(target)}';
+    }
     final prefix = _prefix(role);
+    if (location == login) {
+      final from = uri?.queryParameters['from'];
+      return from != null && from.startsWith('$prefix/') ? from : homeFor(role);
+    }
     if (location == prefix || !location.startsWith('$prefix/')) {
       return homeFor(role);
     }
@@ -101,7 +120,7 @@ const _opsTabs = <ShellDestination>[
   (
     icon: Icons.fact_check_outlined,
     selected: Icons.fact_check_rounded,
-    label: 'Reviews',
+    label: 'Jobs',
   ),
   (
     icon: Icons.record_voice_over_outlined,
@@ -137,8 +156,11 @@ GoRouter buildRouter({
   navigatorKey: _rootKey,
   initialLocation: initialLocation ?? Routes.login,
   refreshListenable: role,
-  redirect: (context, state) =>
-      Routes.redirect(role: role.value, location: state.matchedLocation),
+  redirect: (context, state) => Routes.redirect(
+    role: role.value,
+    location: state.matchedLocation,
+    uri: state.uri,
+  ),
   routes: [
     GoRoute(path: '/', redirect: (_, _) => Routes.login),
     GoRoute(
@@ -196,8 +218,20 @@ GoRouter buildRouter({
           AppShell(shell: shell, destinations: _opsTabs, railBreakpoint: 720),
       branches: [
         _branch(Routes.opsOverview, const OpsOverviewScreen()),
-        _branch(Routes.opsBarbers, const OpsBarbersScreen()),
-        _branch(Routes.opsReviews, const OpsReviewsScreen()),
+        _branch(Routes.opsBarbers, const OpsBarbersScreen(), [
+          GoRoute(
+            path: ':id',
+            builder: (context, state) =>
+                OpsBarberScreen(barberId: state.pathParameters['id']!),
+          ),
+        ]),
+        _branch(Routes.opsJobs, const OpsJobsScreen(), [
+          GoRoute(
+            path: ':id',
+            builder: (context, state) =>
+                OpsJobScreen(jobId: state.pathParameters['id']!),
+          ),
+        ]),
         _branch(Routes.opsDisputes, const OpsDisputesScreen()),
         _branch(Routes.opsPayouts, const OpsPayoutsScreen()),
       ],

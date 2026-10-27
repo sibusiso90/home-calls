@@ -25,6 +25,7 @@ class _BookingChangesPanelState extends ConsumerState<BookingChangesPanel> {
   bool _busy = false;
 
   Future<void> _cancel() async {
+    final container = ProviderScope.containerOf(context, listen: false);
     final reason = await showDialog<String>(
       context: context,
       builder: (_) => CancelBookingDialog(
@@ -36,10 +37,10 @@ class _BookingChangesPanelState extends ConsumerState<BookingChangesPanel> {
     if (reason == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      final job = await ref
+      final job = await container
           .read(apiProvider)
           .cancelJob(widget.job.id, reason: reason);
-      ref.refreshJob(widget.job.id);
+      refreshJobIn(container, widget.job.id);
       if (mounted) {
         showSnack(context, switch (job.paymentStatus) {
           PaymentStatus.refunded =>
@@ -50,7 +51,7 @@ class _BookingChangesPanelState extends ConsumerState<BookingChangesPanel> {
         });
       }
     } on Object catch (e) {
-      ref.refreshJob(widget.job.id);
+      refreshJobIn(container, widget.job.id);
       if (mounted) showSnack(context, friendlyError(e));
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -58,6 +59,7 @@ class _BookingChangesPanelState extends ConsumerState<BookingChangesPanel> {
   }
 
   Future<void> _reschedule() async {
+    final container = ProviderScope.containerOf(context, listen: false);
     final moved = await showModalBottomSheet<bool>(
       context: context,
       useRootNavigator: true,
@@ -67,7 +69,7 @@ class _BookingChangesPanelState extends ConsumerState<BookingChangesPanel> {
       builder: (_) => RescheduleSheet(job: widget.job),
     );
     if (moved ?? false) {
-      ref.refreshJob(widget.job.id);
+      refreshJobIn(container, widget.job.id);
       if (mounted) {
         showSnack(context, 'Moved. Your barber will re-confirm the new time.');
       }
@@ -251,16 +253,20 @@ class _RescheduleSheetState extends ConsumerState<RescheduleSheet> {
   Future<void> _save() async {
     final slot = _picked;
     if (slot == null) return;
+    final container = ProviderScope.containerOf(context, listen: false);
+    final slots = barberSlotsProvider(widget.job.barber.id);
     setState(() {
       _saving = true;
       _error = null;
     });
     try {
-      await ref.read(apiProvider).rescheduleJob(widget.job.id, slotStart: slot);
-      ref.invalidate(barberSlotsProvider(widget.job.barber.id));
+      await container
+          .read(apiProvider)
+          .rescheduleJob(widget.job.id, slotStart: slot);
+      container.invalidate(slots);
       if (mounted) Navigator.pop(context, true);
     } on Object catch (e) {
-      ref.invalidate(barberSlotsProvider(widget.job.barber.id));
+      container.invalidate(slots);
       if (mounted) setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) setState(() => _saving = false);

@@ -15,7 +15,10 @@ import '../helpers.dart';
 void main() {
   group('Routes.redirect', () {
     test('signed-out users go to login', () {
-      expect(Routes.redirect(role: null, location: '/ops/overview'), '/login');
+      expect(
+        Routes.redirect(role: null, location: '/ops/overview'),
+        '/login?from=%2Fops%2Foverview',
+      );
       expect(Routes.redirect(role: null, location: '/login'), isNull);
     });
 
@@ -31,6 +34,26 @@ void main() {
       expect(
         Routes.redirect(role: Role.operator, location: '/login'),
         Routes.opsOverview,
+      );
+    });
+
+    test('a deep link survives sign-in when it fits the role', () {
+      final job = Uri.parse('/client/bookings/j-1');
+      final toLogin = Routes.redirect(
+        role: null,
+        location: job.path,
+        uri: job,
+      )!;
+      expect(toLogin, '/login?from=%2Fclient%2Fbookings%2Fj-1');
+      final back = Uri.parse(toLogin);
+      expect(
+        Routes.redirect(role: Role.client, location: back.path, uri: back),
+        '/client/bookings/j-1',
+      );
+      // Another role's link is not honoured.
+      expect(
+        Routes.redirect(role: Role.barber, location: back.path, uri: back),
+        Routes.barberJobs,
       );
     });
 

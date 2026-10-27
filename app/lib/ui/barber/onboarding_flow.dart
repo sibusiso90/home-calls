@@ -5,6 +5,7 @@ import 'package:fade_call/data/models/models.dart';
 import 'package:fade_call/data/upload_file.dart';
 import 'package:fade_call/state/barber_state.dart';
 import 'package:fade_call/state/providers.dart';
+import 'package:fade_call/ui/widgets/ai_attribution.dart';
 import 'package:fade_call/ui/widgets/badges.dart';
 import 'package:fade_call/ui/widgets/common.dart';
 import 'package:fade_call/ui/widgets/consent_gate.dart';
@@ -189,8 +190,9 @@ class _VoiceProfileStepState extends ConsumerState<_VoiceProfileStep> {
         languages: _split(_languages.text),
         availability: _availability.text.trim(),
       );
-      await ref.read(apiProvider).confirmProfile(profile);
-      ref.invalidate(myBarberProvider);
+      final container = ProviderScope.containerOf(context, listen: false);
+      await container.read(apiProvider).confirmProfile(profile);
+      container.invalidate(myBarberProvider);
     } on Object catch (e) {
       if (mounted) setState(() => _error = friendlyError(e));
     } finally {
@@ -272,6 +274,13 @@ class _VoiceProfileStepState extends ConsumerState<_VoiceProfileStep> {
                   style: context.text.bodyMedium?.copyWith(
                     fontStyle: FontStyle.italic,
                   ),
+                ),
+                const SizedBox(height: Gap.sm),
+                AiAttribution.fromVersions(
+                  result.modelVersions,
+                  key: const ValueKey('voice-attribution'),
+                  elapsedMs: result.elapsedMs,
+                  fallback: const [MetaModel.transcribe, MetaModel.spark],
                 ),
               ],
             ),
@@ -412,9 +421,13 @@ class _PortfolioStep extends ConsumerWidget {
             index: i,
             onExpired: () => ref.invalidate(myBarberProvider),
             onDelete: () async {
+              final container = ProviderScope.containerOf(
+                context,
+                listen: false,
+              );
               try {
-                await ref.read(apiProvider).deletePortfolioItem(item.id);
-                ref.invalidate(myBarberProvider);
+                await container.read(apiProvider).deletePortfolioItem(item.id);
+                container.invalidate(myBarberProvider);
               } on Object catch (e) {
                 if (context.mounted) showSnack(context, friendlyError(e));
               }
@@ -596,14 +609,15 @@ class _GradeStepState extends ConsumerState<_GradeStep> {
   String? _error;
 
   Future<void> _grade() async {
+    final container = ProviderScope.containerOf(context, listen: false);
     setState(() {
       _grading = true;
       _error = null;
     });
     try {
-      final result = await ref.read(apiProvider).grade();
-      ref.read(gradeResultProvider.notifier).set(result);
-      ref.invalidate(myBarberProvider);
+      final result = await container.read(apiProvider).grade();
+      container.read(gradeResultProvider.notifier).set(result);
+      container.invalidate(myBarberProvider);
     } on Object catch (e) {
       if (mounted) setState(() => _error = friendlyError(e));
     } finally {

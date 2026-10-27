@@ -1,5 +1,6 @@
 import 'package:fade_call/core/theme.dart';
 import 'package:fade_call/data/models/models.dart';
+import 'package:fade_call/ui/widgets/ai_attribution.dart';
 import 'package:fade_call/ui/widgets/common.dart';
 import 'package:fade_call/ui/widgets/signed_image.dart';
 import 'package:flutter/material.dart';
@@ -42,6 +43,11 @@ class PortfolioCard extends StatelessWidget {
                 icon: const Icon(Icons.delete_outline_rounded),
               ),
           ],
+        ),
+        AiAttribution.fromVersions(
+          item.modelVersions,
+          elapsedMs: item.elapsedMs,
+          prefix: 'Scored by',
         ),
         const SizedBox(height: Gap.sm + 4),
         Row(

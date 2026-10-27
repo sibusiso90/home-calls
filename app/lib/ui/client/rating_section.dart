@@ -31,27 +31,29 @@ class _RatingSectionState extends ConsumerState<RatingSection> {
   }
 
   Future<void> _submit() async {
+    final container = ProviderScope.containerOf(context, listen: false);
     setState(() {
       _sending = true;
       _error = null;
     });
     try {
-      await ref
+      await container
           .read(apiProvider)
           .rate(
             widget.job.id,
             stars: _stars,
             comment: _comment.text.trim().isEmpty ? null : _comment.text.trim(),
           );
-      ref.refreshJob(widget.job.id);
+      refreshJobIn(container, widget.job.id);
     } on ApiException catch (e) {
+      if (!mounted) return;
       setState(
         () => _error = e.isVerdictRequired
             ? 'Ratings unlock after a verified job.'
             : e.message,
       );
     } on Object catch (e) {
-      setState(() => _error = friendlyError(e));
+      if (mounted) setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) setState(() => _sending = false);
     }

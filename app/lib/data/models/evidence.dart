@@ -98,6 +98,7 @@ final class Evidence {
     required this.modelVersions,
     this.operatorReason,
     this.purgedAt,
+    this.elapsedMs,
   });
 
   factory Evidence.fromJson(Json json) {
@@ -120,6 +121,7 @@ final class Evidence {
       modelVersions: json.stringMap('model_versions'),
       operatorReason: json.strOrNull('operator_reason'),
       purgedAt: json.timeOrNull('purged_at'),
+      elapsedMs: json.intOrNull('elapsed_ms'),
     );
   }
 
@@ -134,6 +136,9 @@ final class Evidence {
   final String? decidedBy;
   final Map<String, String> modelVersions;
   final String? operatorReason;
+
+  /// Model time from the after photo arriving to the verdict.
+  final int? elapsedMs;
 
   /// Set when the raw photos were deleted under the retention policy.
   final DateTime? purgedAt;

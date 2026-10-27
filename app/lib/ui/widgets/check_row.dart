@@ -1,14 +1,23 @@
 import 'package:fade_call/core/format.dart';
 import 'package:fade_call/core/theme.dart';
 import 'package:fade_call/data/models/models.dart';
+import 'package:fade_call/ui/widgets/ai_attribution.dart';
 import 'package:fade_call/ui/widgets/badges.dart';
 import 'package:flutter/material.dart';
 
 /// One proof-of-job check: result icon, label, model reason and confidence.
 class CheckRow extends StatelessWidget {
-  const CheckRow({required this.label, required this.check, super.key});
+  const CheckRow({
+    required this.label,
+    required this.check,
+    super.key,
+    this.model,
+  });
 
   final String label;
+
+  /// The model that judged this check, shown as a chip once it has run.
+  final MetaModel? model;
 
   /// Null while the check has not run yet (e.g. after checks before the
   /// after photo is in).
@@ -67,12 +76,15 @@ class CheckRow extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (extras.isNotEmpty) ...[
+                  if (extras.isNotEmpty || (model != null && c != null)) ...[
                     const SizedBox(height: Gap.xs),
                     Wrap(
                       spacing: Gap.xs,
                       runSpacing: Gap.xs,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
+                        if (model != null && c != null)
+                          ModelChip(model: model!),
                         for (final e in extras)
                           DecoratedBox(
                             decoration: BoxDecoration(

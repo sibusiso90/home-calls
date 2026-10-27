@@ -240,10 +240,18 @@ A dispute holds the payout (`payment_status: held`) until the operator resolves 
 
 ## Operator (role: operator)
 
-- `GET /ops/summary` returns `{"barbers_pending": 2, "jobs_needs_review": 1, "open_disputes": 1, "payouts_released_zar": 1540}`.
+- `GET /ops/summary` returns:
+
+  ```json
+  {"barbers_pending": 2, "jobs_needs_review": 1, "open_disputes": 1, "payouts_released_zar": 1540,
+   "jobs_total": 9, "verified_jobs": 5, "decided_jobs": 7, "pass_rate": 0.714, "avg_verdict_ms": 8200}
+  ```
+
+  `decided_jobs` counts jobs with any verdict; `pass_rate` is the share of those whose current verdict is `pass` (`null` with none); `avg_verdict_ms` is the mean model time from the after photo arriving to the verdict (`null` with none).
+- `GET /ops/barbers/{id}` returns `{"barber": Barber, "jobs": [Job, ...], "ratings": [{"job_id", "stars", "comment", "client_name", "created_at"}]}` (jobs newest slot first).
 - `GET /ops/barbers?status=pending_approval` lists Barbers.
 - `POST /ops/barbers/{id}/approve` and `POST /ops/barbers/{id}/reject` take `{"reason": "..."}`.
-- `GET /ops/jobs?status=needs_review` lists Jobs, each with Evidence.
+- `GET /ops/jobs?status=needs_review` lists Jobs, each with Evidence. Without `status` it lists every job, newest first.
 - `POST /ops/jobs/{id}/verdict` takes `{"verdict": "pass" | "fail", "reason": "..."}`, stores it with `decided_by: "operator"` and the reason, then applies the pass effects.
 - `GET /ops/disputes` lists Disputes with their Job.
 - `POST /ops/disputes/{id}/resolve` takes `{"outcome": "release" | "refund" | "partial_refund", "reason": "..."}`.
@@ -270,6 +278,10 @@ Every user has an in-app inbox. Events create notifications: booking created (cl
 Reminders: `python -m fadecall.reminders` (hourly Modal cron) notifies both sides of every `booked`/`confirmed` job starting in the next 24 hours that has no `reminder_sent_at`, then sets it (idempotent).
 
 WhatsApp copies (stretch goal) go out through the Meta WhatsApp Cloud API only when `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_ID` are both set; otherwise notifications are in-app only.
+
+## Model latency
+
+AI output carries `elapsed_ms` (integer, model time for that step; `null` on older rows): PortfolioItem (Muse Spark grading), Evidence (after photo → model verdict), Dispute (transcribe + summary), the voice-note response (transcribe + profile) and Quote (already listed). Disputes also carry `model_versions`.
 
 ## Media
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from statistics import mean
 from typing import Any
 
@@ -26,6 +27,7 @@ MIN_PORTFOLIO = 5
 async def voice_note_profile(
     models: ModelClient, settings: Settings, barber: Barber, audio: bytes
 ) -> dict[str, Any]:
+    started = time.perf_counter()
     wav = await to_wav(audio, settings.ffmpeg_path, required=models.mode == "live")
     transcript = await models.transcribe(
         wav, P.TRANSCRIBE_LANGUAGE_BIAS, P.TRANSCRIBE_KEYWORDS, purpose="profile"
@@ -57,6 +59,7 @@ async def voice_note_profile(
             "transcribe": models.versions["transcribe"],
             "spark": models.versions["spark"],
         },
+        "elapsed_ms": int((time.perf_counter() - started) * 1000),
     }
 
 
@@ -89,9 +92,11 @@ async def add_portfolio_item(
 ) -> PortfolioItem:
     before_jpg = normalise_photo(before, "before")
     after_jpg = normalise_photo(after, "after")
+    started = time.perf_counter()
     data = await models.spark_json(
         P.GRADE_SYSTEM, P.grade_user_text(), [before_jpg, after_jpg], P.GRADE_SCHEMA, P.GRADE_NAME
     )
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
     raw_scores = data.get("scores") or {}
     raw_reasons = data.get("reasons") or {}
     scores = {k: int(max(0, min(10, round(float(raw_scores.get(k, 0)))))) for k in DIMENSIONS}
@@ -112,6 +117,7 @@ async def add_portfolio_item(
         reasons=reasons,
         overall=round(mean(scores.values()), 1),
         model_versions={"spark": models.versions["spark"]},
+        elapsed_ms=elapsed_ms,
     )
     db.add(item)
     db.commit()
