@@ -35,7 +35,7 @@ else
     echo "SUPABASE_SERVICE_KEY=$sb_key"
     echo "SECRET_KEY=$(openssl rand -hex 32)"
     echo "OPERATOR_PASSCODE=$passcode"
-    [[ -n $model_key ]] && echo "MODEL_API_KEY=$model_key"
+    if [[ -n $model_key ]]; then echo "MODEL_API_KEY=$model_key"; fi
   } >"$envfile"
   echo "Wrote $envfile. Operator passcode: $passcode (also in that file)."
 fi
