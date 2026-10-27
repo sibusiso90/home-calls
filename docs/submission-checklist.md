@@ -6,7 +6,7 @@ Target: submit by **Wed 4 Nov 2026, 15:00 SAST**. Hard close: Thu 5 Nov, 04:00 S
 
 - [x] Code public at https://github.com/sibusiso90/home-calls
 - [x] README: what was built, Meta models, measured live results, limits, consent note, run steps
-- [x] Live models verified: smoke test, 12/12 prompt evals, full end-to-end script
+- [x] Live models verified: smoke test, 12/12 prompt evals, full end-to-end script (13/13 steps on 27 Oct, including a time-window request)
 - [x] Demo video script with shot list and click-by-click: [demo-script.md](demo-script.md)
 - [x] Consent form to print: [consent-form.md](consent-form.md)
 
@@ -40,7 +40,7 @@ Target: submit by **Wed 4 Nov 2026, 15:00 SAST**. Hard close: Thu 5 Nov, 04:00 S
 
 **One-liner:** Meta's models grade a barber's work, quote each cut and check every home call before payment is released or a rating unlocks.
 
-**Description:** Some of the best barbers in South Africa cut on the roadside for about R20, while plenty of clients would pay around R400 for a home visit. The gap is trust. Fade Call turns a barber's skill into a verified track record. A voice note becomes a profile (Muse Voice Transcribe and Muse Spark). Five before/after pairs are graded with a reason for every score and set the barber's tier and price. A client's selfie becomes a named cut, a time, face-shape advice and an all-in price including travel (SAM 3.1 hair masks and Muse Spark). At the job, live-camera before and after photos are checked for time, GPS, same person, a changed hair region and a match with the ordered cut. Only a pass releases payment and unlocks a rating; anything else goes to a human. No verified job, no rating.
+**Description:** Some of the best barbers in South Africa cut on the roadside for about R20, while plenty of clients would pay around R400 for a home visit. The gap is trust. Fade Call turns a barber's skill into a verified track record. A voice note becomes a profile (Muse Voice Transcribe and Muse Spark). Five before/after pairs are graded with a reason for every score and set the barber's tier and price. A client's selfie becomes a named cut, a time, face-shape advice and an all-in price including travel (SAM 3.1 hair masks and Muse Spark). The client asks for a time window, even this afternoon; the chosen barber has 10 minutes, then every verified barber nearby is asked, and whoever takes it sets the time. At the job, live-camera before and after photos are checked for time, GPS, same person, a changed hair region and a match with the ordered cut. Only a pass releases payment and unlocks a rating; anything else goes to a human. No verified job, no rating.
 
 **Meta models:** Muse Spark, Muse Voice Transcribe, SAM 3.1.
 

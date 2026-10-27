@@ -33,9 +33,11 @@ Four flows ship. Everything else is mocked or cut. Each flow has one AI job that
 
 ## Flow 3: Match and book
 
-1. A ranked list of verified barbers in travel range shows tier, verified jobs, rating and next slot.
-2. The client picks a barber. The app confirms with both sides and issues a deposit link (mocked).
-3. A reminder goes out the day before. WhatsApp delivery is a stretch goal.
+1. A ranked list of verified barbers in travel range shows tier, verified jobs, rating, price and the first free time.
+2. The client asks for a day (today included) and one or more time windows: morning 08–12, afternoon 12–17, evening 17–20 (Sunday 09–17). Windows with less than an hour left can't be picked.
+3. The request goes to the barber the client chose, who has 10 minutes to accept. If they decline or don't answer, every verified barber in range is notified. "Ask all nearby barbers" skips straight to that.
+4. The barber who takes it picks the exact start from their free times inside the windows, with travel time between jobs kept clear. The job is confirmed and the client pays the deposit (mocked). A request nobody takes expires when its windows pass.
+5. A reminder goes out the day before. WhatsApp delivery is a stretch goal.
 
 ## Flow 4: Proof of job (the core)
 

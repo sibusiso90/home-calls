@@ -4,11 +4,12 @@
     cd backend && uv run python ../scripts/live_e2e.py --base https://<modal-url> --passcode <op>
 
 Barber: voice note -> confirm profile -> 5 portfolio pairs -> grade. Operator approves.
-Client: catalog list -> quote from a reference -> re-quote a suggestion -> matches -> book.
-Job 1: confirm, deposit, before/after proof of the same person -> rating (operator passes it
-if the model sends it to review). Job 2: after photo of a different person -> dispute by
-voice note -> operator resolves. Uses synthetic illustrated faces only. Each run uses fresh
-phone numbers, so it never collides with seeded or real data.
+Client: catalog list -> quote from a reference -> re-quote a suggestion -> matches.
+Job 1: the client asks for tomorrow's time windows; the barber picks the start and accepts;
+deposit; before/after proof of the same person -> rating (operator passes it if the model
+sends it to review). Job 2: booked directly at a slot, confirmed, deposit; after photo of a
+different person -> dispute by voice note -> operator resolves. Uses synthetic illustrated
+faces only. Each run uses fresh phone numbers, so it never collides with seeded or real data.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,7 @@ VOICE_NOTE = (
     "Hi, my name is Thabo. I have been cutting hair for six years in Midrand. "
     "I do skin fades, tapers and line-ups. I speak isiZulu and English and I work weekday evenings."
 )
+SAST = timezone(timedelta(hours=2))
 COMPLAINT = "The barber left the fade uneven on the left side and did not finish the line-up."
 
 
@@ -179,12 +181,32 @@ def main() -> int:
         mine = next(m for m in matches if m["barber"]["id"] == state["barber_id"])
         s.note = f"{len(matches)} matches; ours R{mine['price']['total_zar']}"
 
-    with Step("book two slots, confirm, deposit") as s:
+    with Step("request a time window, barber sets the time") as s:
+        body = {
+            "quote_id": state["quote"]["id"],
+            "day": (datetime.now(SAST) + timedelta(days=1)).date().isoformat(),
+            "windows": ["morning", "afternoon", "evening"],
+            "address": "12 Example Rd, Midrand",
+            "lat": -25.99,
+            "lng": 28.12,
+            "barber_id": state["barber_id"],
+        }
+        req = client.call("POST", "/requests", json=body)
+        offer = next(r for r in barber.call("GET", "/requests") if r["id"] == req["id"])
+        if not offer["offered_to_you"] or not offer["slots"]:
+            raise AssertionError("the chosen barber must get the offer with free slots")
+        job = barber.call(
+            "POST", f"/requests/{req['id']}/accept", json={"slot_start": offer["slots"][0]}
+        )
+        client.call("POST", f"/jobs/{job['id']}/pay-deposit")
+        state["job1"] = job
+        s.note = f"{req['summary']}; barber took {job['slot_start']} at R{job['quote_zar']}"
+
+    with Step("book a slot directly, confirm, deposit") as s:
         slots = client.call("GET", f"/barbers/{state['barber_id']}/slots?days=7")
-        starts = slots["slots"]
-        state["job1"] = book(client, barber, state["quote"]["id"], state["barber_id"], starts[0])
-        state["job2"] = book(client, barber, state["quote"]["id"], state["barber_id"], starts[1])
-        s.note = f"{starts[0]} and {starts[1]}"
+        start = slots["slots"][0]
+        state["job2"] = book(client, barber, state["quote"]["id"], state["barber_id"], start)
+        s.note = start
 
     with Step("job 1 proof: same person") as s:
         proof(barber, state["job1"], "before", media["before.jpg"], 3)

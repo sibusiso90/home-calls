@@ -34,6 +34,7 @@ Nine days, 27 Oct – 4 Nov 2026 (SAST). Proof of job is built first because it 
 - [x] Cut from a catalog list or a suggested cut, with face-shape advice and "quote this cut instead" (added 27 Oct; live-tested)
 - [x] Ranking by tier, verified jobs, rating and distance
 - [x] Booking confirmation and reminders (in-app; also cancel and reschedule)
+- [x] Same-day booking by time window: the chosen barber has 10 minutes, then every barber nearby; the barber who takes it sets the time (added 27 Oct; live E2E)
 
 ## Sat 31 Oct – Sun 1 Nov: real world
 

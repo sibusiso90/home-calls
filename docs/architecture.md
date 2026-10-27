@@ -68,6 +68,7 @@ flowchart LR
 | `clients` | id, phone, area |
 | `jobs` | id, barber_id, client_id, cut, minutes, quote_zar, travel_band, slot, status |
 | `evidence` | job_id, before_url, after_url, masks (json), checks (json), verdict, reasons, model_versions |
+| `booking_requests` | quote_id, client_id, day, windows (json), chosen_barber_id, offered_until, broadcast_at, declined_by (json), status, job_id |
 | `ratings` | job_id, stars, comment (insert allowed only when verdict = pass) |
 | `disputes` | job_id, transcript, summary, outcome |
 

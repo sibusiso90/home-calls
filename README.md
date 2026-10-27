@@ -16,7 +16,7 @@ Fade Call turns a barber's skill into a verified track record. Meta's models gra
 | Date | State |
 | --- | --- |
 | 26 Oct 2026 | Planning docs. The window opens at 18:00 SAST; the build starts that evening: app shell, backend, schema, model layer (mock until API keys arrive). |
-| 27 Oct 2026 | All four flows, the operator view, disputes and in-app reminders work end to end. Postgres migrations and a local Docker stack are done. Live Meta models: the smoke test, all 12 prompt evals and the full end-to-end script pass. Clients can now pick a cut from a catalog or take a suggested one, with face-shape advice. Next: Modal deploy, real phones, a real barber. |
+| 27 Oct 2026 | All four flows, the operator view, disputes and in-app reminders work end to end. Postgres migrations and a local Docker stack are done. Live Meta models: the smoke test, all 12 prompt evals and the full end-to-end script pass. Clients can now pick a cut from a catalog or take a suggested one, with face-shape advice, and book by time window (same day included); the barber who takes the job sets the time. Next: Modal deploy, real phones, a real barber. |
 | 2 Nov 2026 | Feature freeze. |
 | 4 Nov 2026 | Submission. |
 
@@ -26,7 +26,7 @@ Four flows ship, each with one AI job you can see on screen. See [docs/product-s
 
 1. **Barber onboarding.** A voice note in any South African language becomes a profile. Five before/after photo pairs are graded and set the barber's tier and price band.
 2. **Client quote.** A selfie plus a reference photo, a cut picked from the catalog, or no choice at all (Muse Spark suggests one) becomes a named cut, a time estimate and an all-in price that includes travel. Every quote adds face-shape advice and up to three other cuts that would suit, each one tap away from its own quote.
-3. **Match and book.** A ranked list of verified barbers in range, then a booking.
+3. **Match and book.** A ranked list of verified barbers in range. The client asks for a day and one or more time windows (morning, afternoon, evening; today too), either from one barber or from every barber nearby. A chosen barber has 10 minutes to accept before everyone in range is asked. The barber who takes it picks the exact start time.
 4. **Proof of job.** Live-camera before and after photos, checked for timestamp, GPS, same person, a changed hair region and a match with the ordered cut. Only a pass releases payment and unlocks a rating.
 
 ## Meta models
@@ -58,11 +58,12 @@ Run on 27 Oct 2026 against the Meta Model API (`muse-spark-1.3`, `muse-voice-tra
 | Voice note to profile | 15 s | Name, years cutting and area extracted |
 | Grade five portfolio pairs | 57 s | Tier and average score with reasons |
 | Quote from selfie and reference | 12 s | Named catalog cut, minutes, face advice, suggestions |
-| Proof of job, same person | 10 s | All capture checks, same person and hair change pass; cut match `uncertain`, so the job goes to review |
+| Time-window request | 0.1 s | Barber gets the offer with free starts inside the windows, picks one, job confirmed |
+| Proof of job, same person | 10–14 s | All capture checks, same person and hair change pass; cut match passed in the latest run, was `uncertain` (sent to review) in an earlier one |
 | Proof of job, different person | 8 s | Same person `fail`, job goes to review, no payout |
 | Dispute voice note to case | 17 s | Summary and a suggested outcome |
 
-Reproduce with `scripts/live_e2e.py` (below). Cut match on cartoon faces is expected to be uncertain; real photos are the next test.
+Reproduce with `scripts/live_e2e.py` (below); the latest run passed all 13 steps. Cut match on cartoon faces can come back uncertain; real photos are the next test.
 
 ## Limits
 

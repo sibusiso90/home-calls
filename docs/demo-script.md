@@ -9,7 +9,7 @@ Three minutes, recorded Tue 3 Nov. One real barber and one real client, both wit
 | 0:00–0:15 | Roadside barber, then a client at home | No app yet | "Some of the best barbers in South Africa cut on the roadside for R20. Clients would pay R400 for a home visit. The gap is trust." |
 | 0:15–0:45 | Barber onboarding | Voice note recorded, then the profile card; 5 portfolio pairs, then scores with reasons, tier and price band | "A voice note becomes a profile. Muse Spark grades five cuts, with a reason for every score, and sets the tier and price." |
 | 0:45–1:10 | Client quote | Selfie and reference photo, then SAM 3.1 hair masks, named cut, minutes, face-shape advice and suggested cuts; tap "Quote this cut instead" | "SAM 3.1 finds the hair. Muse Spark names the cut, says what suits your face, and quotes it, travel included." |
-| 1:10–1:25 | Match and book | Ranked barbers, then booking, then the deposit (mocked) | "Only verified barbers show up, ranked by tier, verified jobs, rating and distance." |
+| 1:10–1:25 | Match and book | Ranked barbers; ask Thabo for this afternoon; Thabo's phone gets the request with a countdown, picks a time, accepts; client pays the deposit (mocked) | "Only verified barbers show up. Ask for this afternoon: your barber has ten minutes, then every verified barber nearby gets it, and whoever takes it sets the time." |
 | 1:25–2:20 | Proof of job (the core) | Live-camera before photo at the door (timestamp and GPS), the cut, the after photo, then each check with its reason, then PASS | "No gallery uploads. Same person, hair changed, cut matches. Only a pass releases payment." |
 | 2:20–2:35 | Rating unlocks | Client rates; the job joins the barber's verified record | "No verified job, no rating." |
 | 2:35–2:50 | Dispute and operator | Voice complaint, then the case summary; the operator view with evidence | "If something goes wrong, a voice note becomes a case the operator can rule on." |
@@ -20,6 +20,7 @@ Three minutes, recorded Tue 3 Nov. One real barber and one real client, both wit
 - [ ] Live models on (no "Mock models" badge in any shot)
 - [ ] Barber onboarded on the deployed app, approved by the operator
 - [ ] Booking slot and GPS match the filming location
+- [ ] The window asked for in the booking shot still has at least an hour left (afternoon closes for new requests at 15:30, evening at 19:00)
 - [ ] Voice note language decided after the isiZulu test: isiZulu if it holds, English with code-switching if not
 - [ ] Signed consent from everyone whose face or voice appears
 - [ ] Captions on; the video link opens in a logged-out browser
@@ -61,6 +62,9 @@ Timings match the shot list above. Phone shots at phone width; operator shots on
 | 1:00 | Same, scroll | Show hair mask / photos | **SAM 3.1** hair masks on both photos |
 | 1:04 | Same, scroll | Face advice → a suggested cut → Quote this cut instead | New quote for the suggested cut, no new selfie (**Muse Spark**) |
 | 1:10 | See barbers near you | Scroll the ranked list | Tier, verified jobs, rating, distance, price breakdown |
+| 1:15 | Same | Ask Thabo → Today → Afternoon (or Evening) → Send request | "Waiting for Thabo M" with a 10-minute countdown in My bookings |
+| 1:19 | Barber Thabo → Jobs | New requests → a start time → Accept | Confirmed job; client gets "Thabo M is coming" |
+| 1:22 | Client Naledi → My bookings → job | Pay deposit | Deposit paid (mocked) |
 | 1:25 | Barber Thabo | Bell → New booking / Deposit paid → the job | Today's job, deposit paid |
 | 1:30 | Capture before photo | Client agrees → shutter → Use photo | Live camera with time + GPS overlay; before checks pass |
 | 1:50 | Capture after photo | Client agrees → shutter → Use photo | "Verifying…" steps |

@@ -106,7 +106,8 @@ Open `https://<workspace>--fade-call-api.modal.run` on an Android phone in Chrom
 - [ ] Allow camera and location when prompted; the capture screen shows a live preview, the timestamp and GPS.
 - [ ] Barber: record a voice note, then check the transcript, the profile and the read-back.
 - [ ] Barber: upload portfolio pairs and check the scores, tier and price band.
-- [ ] Client: send a selfie and a reference photo, check the named cut, minutes and price, then book.
+- [ ] Client: send a selfie and a reference photo, check the named cut, minutes and price, then ask a barber for a time window today.
+- [ ] Barber (second phone): the request shows with a countdown; pick a start time and accept. The client gets "… is coming" and pays the deposit.
 - [ ] Job: take the before photo, then the after photo, and check the hair-mask overlays and the verdict. Overlay images must load; if they are broken, check `PUBLIC_BASE_URL`.
 - [ ] Operator: log in with `OPERATOR_PASSCODE` and check the review queue.
 - [ ] Add to the home screen; the app opens standalone.
