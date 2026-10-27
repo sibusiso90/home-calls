@@ -201,6 +201,13 @@ alter table disputes         enable row level security;
 alter table payouts          enable row level security;
 
 -- Private media bucket (served only through the API's signed /media URLs).
-insert into storage.buckets (id, name, public)
-values ('fadecall-private', 'fadecall-private', false)
-on conflict (id) do nothing;
+-- Guarded so the schema also applies to plain Postgres (no Supabase storage schema).
+do $$
+begin
+    if to_regclass('storage.buckets') is not null then
+        insert into storage.buckets (id, name, public)
+        values ('fadecall-private', 'fadecall-private', false)
+        on conflict (id) do nothing;
+    end if;
+end;
+$$;

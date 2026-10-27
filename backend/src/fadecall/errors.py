@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
@@ -61,6 +62,13 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ModelError)
     async def _model_error(_: Request, exc: ModelError) -> JSONResponse:
         return _envelope(502, "model_error", str(exc) or "Model call failed")
+
+    @app.exception_handler(IntegrityError)
+    async def _integrity(_: Request, exc: IntegrityError) -> JSONResponse:
+        # A DB backstop (unique slot, one open dispute, one live payout, rating
+        # needs a pass) fired because a concurrent request won a race the app
+        # check could not see. That is a conflict, not a server error.
+        return _envelope(409, "conflict", "That conflicts with a concurrent change; refresh")
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, exc: RequestValidationError) -> JSONResponse:

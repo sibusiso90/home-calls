@@ -116,6 +116,30 @@ def test_db_unique_index_blocks_two_live_payouts(client: TestClient) -> None:
             db.commit()
 
 
+def test_slot_backstop_and_racing_booking_is_a_409(client: TestClient) -> None:
+    """A booking that loses a race hits uq_jobs_barber_slot: 409, never a 500."""
+    c = client
+    _, _, ch, barber = setup(c)
+    job = quote_and_book(c, ch, barber["id"])
+    with state(c).sessionmaker() as db:
+        j = db.get(Job, job["id"])
+        twin = {k: getattr(j, k) for k in ("barber_id", "client_id", "cut", "minutes")}
+        twin |= {k: getattr(j, k) for k in ("quote_zar", "travel_band", "slot_start", "slot_end")}
+        db.add(Job(**twin, address="x", lat=0.0, lng=0.0))
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+        db.add(Job(**twin, address="x", lat=0.0, lng=0.0, status="cancelled"))
+        db.commit()  # cancelled rows do not hold the slot
+
+    def lose_race() -> None:
+        raise IntegrityError("INSERT", {}, Exception("uq_jobs_barber_slot"))
+
+    c.app.add_api_route("/_test/integrity", lose_race)  # type: ignore[attr-defined]
+    r = c.get("/_test/integrity")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "conflict"
+
+
 # 2. Deposit must be paid -------------------------------------------------------
 
 
