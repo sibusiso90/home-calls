@@ -14,6 +14,7 @@ I agree that Fade Call may:
 - [ ] Send these photos and voice notes to Meta's AI models (Muse Spark, Muse Voice Transcribe and SAM 3.1) to check the haircut, compare the before and after photos of the same job, describe my face shape and hairline to suggest cuts, and turn a voice note into text.
 - [ ] Record the time and GPS location of the before and after photos.
 - [ ] Show these photos, voice notes and results in a public demo video (about 3 minutes) and in screenshots for the hackathon submission.
+- [ ] Optional: use a photo of my finished cut as a public example picture of that cut in the app's cut list.
 
 I understand that:
 

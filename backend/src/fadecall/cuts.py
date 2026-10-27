@@ -100,3 +100,8 @@ CUT_IDS = [c.id for c in CUTS]
 
 def get_cut(cut_id: str | None) -> Cut | None:
     return CUTS_BY_ID.get(cut_id) if cut_id else None
+
+
+def cut_photo_key(cut_id: str) -> str:
+    """Storage key of an uploaded photo that replaces the cut's illustration."""
+    return f"cuts/{cut_id}.jpg"

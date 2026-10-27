@@ -75,10 +75,21 @@ void main() {
       'low-taper-lineup',
     ]);
     expect(q.suggestions.last.minutes, 40);
+    expect(q.cutImageUrl, endsWith('/cuts/mid-skin-fade-textured/picture'));
+    expect(q.suggestions.first.imageUrl, isNull);
+    expect(q.suggestions.last.imageUrl, endsWith('/low-taper-lineup/picture'));
 
     final cuts = decodeList(cutsJson).map(Cut.fromJson).toList();
     expect(cuts.last.name, 'Buzz cut');
     expect(cuts.first.styles, contains('mid fade'));
+    expect(cuts.first.imageUrl, isNull);
+    expect(cuts.last.imageUrl, endsWith('/cuts/buzz-cut/picture'));
+
+    final j = Job.fromJson(decode(jobJson(pictures: jobPicturesJson)));
+    expect(j.cutId, 'mid-skin-fade-textured');
+    expect(j.cutImageUrl, endsWith('/mid-skin-fade-textured/picture'));
+    expect(j.referenceUrl, '/media/r');
+    expect(Job.fromJson(decode(jobJson())).referenceUrl, isNull);
 
     final m = BarberMatch.fromJson(decodeList(matchesJson).single);
     expect(m.barber.thumbnailUrl, isNull);

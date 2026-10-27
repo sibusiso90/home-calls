@@ -4,7 +4,7 @@ The Flutter app and the FastAPI backend both build against this document. JSON k
 
 ## Conventions
 
-- Auth: `Authorization: Bearer <token>` on everything except `/health`, `/auth/demo-login` and `/media/*`.
+- Auth: `Authorization: Bearer <token>` on everything except `/health`, `/auth/demo-login`, `/cuts`, `/cuts/{id}/picture` and `/media/*`.
 - Errors: `{"error": {"code": "string", "message": "human readable"}}` with a 4xx/5xx status. Codes used: `unauthorized`, `forbidden`, `not_found`, `validation`, `verdict_required` (409), `conflict` (409), `model_error` (502).
 - Media URLs in responses are short-lived signed URLs (`/media/{key}?exp=...&sig=...`, 15-minute expiry). Never store them client-side.
 - Every model-produced field carries the reason the model gave. `model_versions` records which models (or `mock`) produced a result.
@@ -98,7 +98,9 @@ Tier rule: average below 6.5 is `starter` (R250–R320), 6.5 to below 8.0 is `pr
 
 ## Client quote, match and book (role: client)
 
-`GET /cuts` lists the cut catalog: `[{"id": "buzz-cut", "name": "Buzz cut", "description": "...", "minutes": 20, "styles": ["buzz cut"]}]`.
+`GET /cuts` lists the cut catalog: `[{"id": "buzz-cut", "name": "Buzz cut", "description": "...", "minutes": 20, "styles": ["buzz cut"], "image_url": "https://.../cuts/buzz-cut/picture"}]`.
+
+`GET /cuts/{id}/picture` (public, cached 10 minutes) returns the operator's uploaded photo of the cut as JPEG, or otherwise a drawn side-profile illustration as PNG. 404 for an unknown cut.
 
 `POST /quotes` (multipart: `selfie` image and `area_id` text field, plus how the client chose the cut)
 
@@ -112,11 +114,13 @@ Sending both is a 422. Every quote carries face advice and up to three suggested
 {
   "id": "uuid", "cut_name": "Mid skin fade with textured top", "minutes": 50,
   "cut_source": "reference", "cut_id": "mid-skin-fade-textured",
+  "cut_image_url": "https://.../cuts/mid-skin-fade-textured/picture",
   "fit_issues": ["Top is short for the textured style; expect a shorter result"],
   "reasons": "Reference shows a mid fade starting at the temple...",
   "face_advice": "An oval face carries most cuts; a clean line-up keeps it sharp.",
   "suggestions": [{"cut_id": "low-taper-lineup", "name": "Low taper with line-up",
-                   "minutes": 40, "why": "A softer taper suits your hairline."}],
+                   "minutes": 40, "why": "A softer taper suits your hairline.",
+                   "image_url": "https://.../cuts/low-taper-lineup/picture"}],
   "selfie_url": "signed", "reference_url": "signed|null",
   "selfie_overlay_url": "signed", "reference_overlay_url": "signed|null",
   "area_id": "midrand-central", "elapsed_ms": 8200,
@@ -169,7 +173,9 @@ Slots are weekdays at 16:00 and Saturdays at 09:00 (SAST), at least one hour ahe
 {
   "id": "uuid", "status": "booked",
   "barber": {"id": "...", "name": "...", "tier": "pro"}, "client": {"id": "...", "name": "..."},
-  "cut": "Mid skin fade", "minutes": 50, "quote_zar": 385, "travel_band": "B",
+  "cut": "Mid skin fade", "cut_id": "mid-skin-fade-textured|null",
+  "cut_image_url": "https://.../cuts/mid-skin-fade-textured/picture|null",
+  "reference_url": "signed|null", "minutes": 50, "quote_zar": 385, "travel_band": "B",
   "slot_start": "...", "slot_end": "...", "address": "...", "lat": -25.99, "lng": 28.12,
   "deposit_url": "https://pay.example/mock/...", "payment_status": "deposit_pending",
   "evidence": Evidence | null, "rating": {"stars": 5, "comment": "..."} | null,
@@ -269,6 +275,7 @@ A dispute holds the payout (`payment_status: held`) until the operator resolves 
 - `POST /ops/jobs/{id}/verdict` takes `{"verdict": "pass" | "fail", "reason": "..."}`, stores it with `decided_by: "operator"` and the reason, then applies the pass effects.
 - `GET /ops/disputes` lists Disputes with their Job.
 - `POST /ops/disputes/{id}/resolve` takes `{"outcome": "release" | "refund" | "partial_refund", "reason": "..."}`.
+- `PUT /ops/cuts/{id}/picture` (multipart: `photo`) replaces the cut's illustration with a real photo and returns the Cut. The picture URL is public, so upload only with consent. `DELETE /ops/cuts/{id}/picture` goes back to the illustration.
 - `GET /ops/payouts` returns the mock ledger: `[{"job_id", "barber_id", "barber_name", "amount_zar", "status", "created_at"}]`.
 
 ## Notifications (any role)

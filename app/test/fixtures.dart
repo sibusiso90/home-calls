@@ -61,6 +61,7 @@ const quoteJson = '''
 {
   "id": "q-1", "cut_name": "Mid skin fade with textured top", "minutes": 50,
   "cut_source": "reference", "cut_id": "mid-skin-fade-textured",
+  "cut_image_url": "http://api.test/cuts/mid-skin-fade-textured/picture",
   "fit_issues": ["Top is short for the textured style; expect a shorter result"],
   "reasons": "Reference shows a mid fade starting at the temple...",
   "face_advice": "An oval face carries most cuts; a clean line-up keeps it sharp.",
@@ -68,7 +69,8 @@ const quoteJson = '''
     {"cut_id": "mid-skin-fade-textured", "name": "Mid skin fade with textured top",
      "minutes": 50, "why": "Height on top balances your jaw."},
     {"cut_id": "low-taper-lineup", "name": "Low taper with line-up",
-     "minutes": 40, "why": "A softer taper suits your hairline."}
+     "minutes": 40, "why": "A softer taper suits your hairline.",
+     "image_url": "http://api.test/cuts/low-taper-lineup/picture"}
   ],
   "selfie_url": "/media/s", "reference_url": "/media/r",
   "selfie_overlay_url": "/media/so", "reference_overlay_url": "/media/ro",
@@ -82,7 +84,7 @@ const cutsJson = '''
    "description": "Sides faded to the skin, texture on top.", "minutes": 50,
    "styles": ["skin fade", "mid fade"]},
   {"id": "buzz-cut", "name": "Buzz cut", "description": "One clipper length all over.",
-   "minutes": 20, "styles": ["buzz cut"]}
+   "minutes": 20, "styles": ["buzz cut"], "image_url": "http://api.test/cuts/buzz-cut/picture"}
 ]''';
 
 const matchesJson = '''
@@ -128,6 +130,7 @@ String jobJson({
   bool canRate = false,
   String rating = 'null',
   String paymentStatus = 'deposit_paid',
+  String pictures = '',
 }) =>
     '''
 {
@@ -138,8 +141,14 @@ String jobJson({
   "address": "12 Example Rd, Midrand", "lat": -25.99, "lng": 28.12,
   "deposit_url": "https://pay.example/mock/j-1", "payment_status": "$paymentStatus",
   "evidence": ${evidence ?? 'null'}, "rating": $rating,
-  "dispute": null, "can_rate": $canRate
+  "dispute": null, "can_rate": $canRate$pictures
 }''';
+
+/// Extra job fields for a catalog cut ordered with a reference photo.
+const jobPicturesJson =
+    ', "cut_id": "mid-skin-fade-textured", '
+    '"cut_image_url": "http://api.test/cuts/mid-skin-fade-textured/picture", '
+    '"reference_url": "/media/r"';
 
 const disputeJson = '''
 {"id": "d-1", "job_id": "j-1", "transcript": "The fade is not even...", "summary": "Client says the fade is uneven...",

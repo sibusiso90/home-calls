@@ -179,6 +179,7 @@ class Job(Base):
 
     barber: Mapped[Barber] = relationship()
     client: Mapped[Client] = relationship()
+    quote: Mapped[Quote | None] = relationship()
     evidence: Mapped[Evidence | None] = relationship(back_populates="job", uselist=False)
     rating: Mapped[Rating | None] = relationship(uselist=False)
     disputes: Mapped[list[Dispute]] = relationship(

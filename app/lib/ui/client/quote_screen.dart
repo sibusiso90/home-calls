@@ -11,6 +11,7 @@ import 'package:fade_call/ui/widgets/ai_attribution.dart';
 import 'package:fade_call/ui/widgets/camera_capture_screen.dart';
 import 'package:fade_call/ui/widgets/common.dart';
 import 'package:fade_call/ui/widgets/consent_gate.dart';
+import 'package:fade_call/ui/widgets/cut_picture.dart';
 import 'package:fade_call/ui/widgets/fade_app_bar.dart';
 import 'package:fade_call/ui/widgets/signed_image.dart';
 import 'package:flutter/material.dart';
@@ -294,6 +295,10 @@ class _CutOption extends StatelessWidget {
                 : context.colors.onSurfaceVariant,
           ),
           const SizedBox(width: Gap.sm + 4),
+          if (cut.imageUrl != null) ...[
+            CutPicture(url: cut.imageUrl, name: cut.name),
+            const SizedBox(width: Gap.sm + 4),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -548,12 +553,29 @@ class _QuoteResultState extends ConsumerState<_QuoteResult> {
                   ),
                 ),
                 const SizedBox(height: Gap.xs),
-                Text(
-                  q.cutName,
-                  key: const ValueKey('quote-cut-name'),
-                  style: context.text.headlineMedium?.copyWith(
-                    color: Palette.cream,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        q.cutName,
+                        key: const ValueKey('quote-cut-name'),
+                        style: context.text.headlineMedium?.copyWith(
+                          color: Palette.cream,
+                        ),
+                      ),
+                    ),
+                    if (q.cutImageUrl != null) ...[
+                      const SizedBox(width: Gap.md),
+                      CutPicture(
+                        key: const ValueKey('quote-cut-picture'),
+                        url: q.cutImageUrl,
+                        name: q.cutName,
+                        size: 96,
+                        radius: 16,
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: Gap.md),
                 Wrap(
@@ -692,19 +714,41 @@ class _SuggestionCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (suggestion.imageUrl != null) ...[
+              CutPicture(url: suggestion.imageUrl, name: suggestion.name),
+              const SizedBox(width: Gap.sm + 4),
+            ],
             Expanded(
-              child: Text(suggestion.name, style: context.text.titleSmall),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          suggestion.name,
+                          style: context.text.titleSmall,
+                        ),
+                      ),
+                      Text(
+                        '~${suggestion.minutes} min',
+                        style: context.text.labelMedium,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: Gap.xs),
+                  Text(
+                    suggestion.why,
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            Text('~${suggestion.minutes} min', style: context.text.labelMedium),
           ],
-        ),
-        const SizedBox(height: Gap.xs),
-        Text(
-          suggestion.why,
-          style: context.text.bodySmall?.copyWith(
-            color: context.colors.onSurfaceVariant,
-          ),
         ),
         const SizedBox(height: Gap.sm),
         Align(

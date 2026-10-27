@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .areas import get_area
-from .cuts import get_cut
+from .cuts import Cut, get_cut
 from .models import (
     Barber,
     Dispute,
@@ -87,20 +87,29 @@ def barber_card_json(b: Barber, s: UrlSigner) -> dict[str, Any]:
     }
 
 
+def cut_image_url(cut_id: str | None, s: UrlSigner) -> str | None:
+    return s.public(f"/cuts/{cut_id}/picture") if get_cut(cut_id) else None
+
+
+def cut_json(c: Cut, s: UrlSigner) -> dict[str, Any]:
+    return {**c.as_dict(), "image_url": cut_image_url(c.id, s)}
+
+
 def quote_json(q: Quote, s: UrlSigner) -> dict[str, Any]:
     return {
         "id": q.id,
         "cut_name": q.cut_name,
         "cut_source": q.cut_source,
         "cut_id": q.cut_id,
+        "cut_image_url": cut_image_url(q.cut_id, s),
         "minutes": q.minutes,
         "fit_issues": q.fit_issues or [],
         "reasons": q.reasons,
         "face_advice": q.face_advice,
         "suggestions": [
-            {**s, "name": c.name, "minutes": c.minutes}
-            for s in q.suggestions or []
-            if (c := get_cut(s.get("cut_id"))) is not None
+            {**x, "name": c.name, "minutes": c.minutes, "image_url": cut_image_url(c.id, s)}
+            for x in q.suggestions or []
+            if (c := get_cut(x.get("cut_id"))) is not None
         ],
         "selfie_url": s.url(q.selfie_key),
         "reference_url": s.url(q.reference_key),
@@ -164,12 +173,16 @@ def can_rate(job: Job) -> bool:
 
 def job_json(j: Job, s: UrlSigner) -> dict[str, Any]:
     d = latest_dispute(j)
+    q = j.quote
     return {
         "id": j.id,
         "status": j.status,
         "barber": {"id": j.barber.id, "name": j.barber.name, "tier": j.barber.tier},
         "client": {"id": j.client.id, "name": j.client.name},
         "cut": j.cut,
+        "cut_id": q.cut_id if q else None,
+        "cut_image_url": cut_image_url(q.cut_id, s) if q else None,
+        "reference_url": s.url(q.reference_key) if q else None,
         "minutes": j.minutes,
         "quote_zar": j.quote_zar,
         "travel_band": j.travel_band,

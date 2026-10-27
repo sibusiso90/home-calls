@@ -105,6 +105,9 @@ final class Job {
     this.cancelReason,
     this.rescheduledAt,
     this.reminderSentAt,
+    this.cutId,
+    this.cutImageUrl,
+    this.referenceUrl,
   });
 
   factory Job.fromJson(Json json) => Job(
@@ -113,6 +116,9 @@ final class Job {
     barber: JobParty.fromJson(json.obj('barber')),
     client: JobParty.fromJson(json.obj('client')),
     cut: json.strOrNull('cut') ?? '',
+    cutId: json.strOrNull('cut_id'),
+    cutImageUrl: json.strOrNull('cut_image_url'),
+    referenceUrl: json.strOrNull('reference_url'),
     minutes: json.intOrNull('minutes') ?? 0,
     quoteZar: json.intOrNull('quote_zar') ?? 0,
     travelBand: json.strOrNull('travel_band'),
@@ -149,6 +155,15 @@ final class Job {
   final JobParty barber;
   final JobParty client;
   final String cut;
+
+  /// Catalog id of the ordered cut; null for a custom cut from a reference photo.
+  final String? cutId;
+
+  /// Picture of the ordered catalog cut.
+  final String? cutImageUrl;
+
+  /// The client's reference photo of the cut they want (signed, expires).
+  final String? referenceUrl;
   final int minutes;
   final int quoteZar;
   final String? travelBand;

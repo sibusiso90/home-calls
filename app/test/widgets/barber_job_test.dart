@@ -8,7 +8,11 @@ import '../fixtures.dart';
 import '../helpers.dart';
 
 void main() {
-  Future<void> pumpJob(WidgetTester tester, String paymentStatus) async {
+  Future<void> pumpJob(
+    WidgetTester tester,
+    String paymentStatus, {
+    String pictures = '',
+  }) async {
     final api = mockApi();
     when(() => api.job(any())).thenAnswer(
       (_) async => Job.fromJson(
@@ -17,6 +21,7 @@ void main() {
             status: 'confirmed',
             evidence: null,
             paymentStatus: paymentStatus,
+            pictures: pictures,
           ),
         ),
       ),
@@ -49,5 +54,28 @@ void main() {
       ),
     );
     expect(button.onPressed, isNotNull);
+  });
+
+  testWidgets('barber sees the ordered cut and the client reference photo', (
+    tester,
+  ) async {
+    await pumpJob(tester, 'deposit_paid', pictures: jobPicturesJson);
+    final pictures = find.byKey(const ValueKey('job-cut-pictures'));
+    expect(pictures, findsOneWidget);
+    expect(
+      find.descendant(of: pictures, matching: find.text('THE CUT')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: pictures, matching: find.text('THEIR PHOTO')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('no picture section for a job without a cut picture', (
+    tester,
+  ) async {
+    await pumpJob(tester, 'deposit_paid');
+    expect(find.byKey(const ValueKey('job-cut-pictures')), findsNothing);
   });
 }

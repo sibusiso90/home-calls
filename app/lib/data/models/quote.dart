@@ -19,6 +19,7 @@ final class Cut {
     required this.description,
     required this.minutes,
     required this.styles,
+    this.imageUrl,
   });
 
   factory Cut.fromJson(Json json) => Cut(
@@ -27,6 +28,7 @@ final class Cut {
     description: json.strOrNull('description') ?? '',
     minutes: json.intOrNull('minutes') ?? 0,
     styles: json.strings('styles'),
+    imageUrl: json.strOrNull('image_url'),
   );
 
   final String id;
@@ -34,6 +36,9 @@ final class Cut {
   final String description;
   final int minutes;
   final List<String> styles;
+
+  /// Public picture of the cut: a real photo once uploaded, else an illustration.
+  final String? imageUrl;
 }
 
 /// A catalog cut Muse Spark thinks suits the client's face.
@@ -43,6 +48,7 @@ final class CutSuggestion {
     required this.name,
     required this.minutes,
     required this.why,
+    this.imageUrl,
   });
 
   factory CutSuggestion.fromJson(Json json) => CutSuggestion(
@@ -50,12 +56,14 @@ final class CutSuggestion {
     name: json.strOrNull('name') ?? '',
     minutes: json.intOrNull('minutes') ?? 0,
     why: json.strOrNull('why') ?? '',
+    imageUrl: json.strOrNull('image_url'),
   );
 
   final String cutId;
   final String name;
   final int minutes;
   final String why;
+  final String? imageUrl;
 }
 
 final class Quote {
@@ -76,6 +84,7 @@ final class Quote {
     required this.areaId,
     required this.elapsedMs,
     required this.modelVersions,
+    this.cutImageUrl,
   });
 
   factory Quote.fromJson(Json json) => Quote(
@@ -83,6 +92,7 @@ final class Quote {
     cutName: json.strOrNull('cut_name') ?? '',
     cutSource: CutSource.parse(json.strOrNull('cut_source')),
     cutId: json.strOrNull('cut_id'),
+    cutImageUrl: json.strOrNull('cut_image_url'),
     minutes: json.intOrNull('minutes') ?? 0,
     fitIssues: json.strings('fit_issues'),
     reasons: json.strOrNull('reasons') ?? '',
@@ -101,6 +111,9 @@ final class Quote {
   final String cutName;
   final CutSource cutSource;
   final String? cutId;
+
+  /// Picture of the quoted catalog cut; null for a custom cut from a reference.
+  final String? cutImageUrl;
   final int minutes;
   final List<String> fitIssues;
   final String reasons;

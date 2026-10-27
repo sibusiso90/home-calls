@@ -7,6 +7,7 @@ import 'package:fade_call/state/providers.dart';
 import 'package:fade_call/state/quote_state.dart';
 import 'package:fade_call/ui/client/quote_screen.dart';
 import 'package:fade_call/ui/widgets/consent_gate.dart';
+import 'package:fade_call/ui/widgets/cut_picture.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -46,6 +47,11 @@ Future<ProviderContainer> _pumpQuote(WidgetTester tester, MockApi api) async {
   return container;
 }
 
+Finder _picture(String key) => find.descendant(
+  of: find.byKey(ValueKey(key)),
+  matching: find.byType(CutPicture),
+);
+
 FilledButton _submit(WidgetTester tester) =>
     tester.widget(find.byKey(const ValueKey('quote-submit')));
 
@@ -76,6 +82,11 @@ void main() {
     await _pumpQuote(tester, api);
 
     expect(find.text('Buzz cut'), findsOneWidget);
+    expect(_picture('cut-buzz-cut'), findsOneWidget);
+    expect(
+      _picture('cut-mid-skin-fade-textured'),
+      findsNothing,
+    ); // no image_url
     expect(_submit(tester).onPressed, isNull);
 
     await tester.tap(find.byKey(const ValueKey('cut-buzz-cut')));
@@ -92,6 +103,8 @@ void main() {
       ),
     ).called(1);
 
+    expect(find.byKey(const ValueKey('quote-cut-picture')), findsOneWidget);
+    expect(_picture('suggestion-low-taper-lineup'), findsOneWidget);
     expect(find.byKey(const ValueKey('quote-face-advice')), findsOneWidget);
     expect(find.text('Your quote'), findsOneWidget);
     final other = find.descendant(

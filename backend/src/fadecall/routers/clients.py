@@ -5,16 +5,17 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, File, Form, Query, UploadFile
+from fastapi import APIRouter, File, Form, Query, Response, UploadFile
 from pydantic import BaseModel
 
 from ..auth import ClientUser, CurrentUser
-from ..cuts import CUTS
+from ..cut_art import cut_png
+from ..cuts import CUTS, cut_photo_key, get_cut
 from ..deps import DB, Models, Signer, Store
 from ..errors import forbidden, not_found, validation
 from ..models import Barber, Quote, get_by_id
 from ..scheduling import DEFAULT_MINUTES, is_bookable
-from ..serializers import job_json, quote_json
+from ..serializers import cut_json, job_json, quote_json
 from ..services import quotes as svc
 from ..services.accounts import client_for, find_client
 from ..services.lifecycle import MAX_SLOT_DAYS, free_slots
@@ -51,8 +52,22 @@ async def create_quote(
 
 
 @router.get("/cuts")
-def cuts() -> list[dict[str, Any]]:
-    return [c.as_dict() for c in CUTS]
+def cuts(signer: Signer) -> list[dict[str, Any]]:
+    return [cut_json(c, signer) for c in CUTS]
+
+
+@router.get("/cuts/{cut_id}/picture")
+async def cut_picture(cut_id: str, storage: Store) -> Response:
+    """Public: the operator's uploaded photo of the cut, else its illustration."""
+    if get_cut(cut_id) is None:
+        raise not_found("Cut")
+    # Short cache so an uploaded photo replaces the drawing within minutes.
+    headers = {"Cache-Control": "public, max-age=600", "X-Content-Type-Options": "nosniff"}
+    photo = await storage.get(cut_photo_key(cut_id))
+    if photo is not None:
+        data, content_type = photo
+        return Response(data, media_type=content_type, headers=headers)
+    return Response(cut_png(cut_id) or b"", media_type="image/png", headers=headers)
 
 
 class RequoteBody(BaseModel):

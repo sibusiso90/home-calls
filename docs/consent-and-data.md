@@ -19,6 +19,11 @@ Fade Call handles faces and voices, so these rules apply from the first commit.
 - The same-person check compares the before and after photos within one job only.
 - No face database, no search across jobs, no identification.
 
+## Cut pictures
+
+- Each catalog cut shows a drawn illustration with no real face.
+- An operator can replace it with a real photo. Cut pictures are public, so a photo is used only with the person's signed consent to appear in the catalog.
+
 ## Face-shape advice
 
 - A quote may describe the client's face shape and hairline to recommend cuts. This is covered by the consent shown before the selfie.

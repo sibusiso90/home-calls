@@ -161,5 +161,8 @@ class UrlSigner:
             return None
         exp = int((now if now is not None else time.time()) + self.ttl)
         sig = media_signature(self.secret, key, exp)
-        base = self.public_base or request_base_url.get().rstrip("/")
-        return f"{base}/media/{quote(key)}?exp={exp}&sig={sig}"
+        return f"{self.public(f'/media/{quote(key)}')}?exp={exp}&sig={sig}"
+
+    def public(self, path: str) -> str:
+        """Absolute URL of a public API path, e.g. a cut picture."""
+        return f"{self.public_base or request_base_url.get().rstrip('/')}{path}"

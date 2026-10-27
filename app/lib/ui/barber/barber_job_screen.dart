@@ -9,6 +9,7 @@ import 'package:fade_call/ui/widgets/evidence_view.dart';
 import 'package:fade_call/ui/widgets/fade_app_bar.dart';
 import 'package:fade_call/ui/widgets/job_timeline.dart';
 import 'package:fade_call/ui/widgets/job_widgets.dart';
+import 'package:fade_call/ui/widgets/signed_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -59,6 +60,11 @@ class _BarberJobScreenState extends ConsumerState<BarberJobScreen> {
           onRefresh: () => ref.refresh(jobProvider(widget.jobId).future),
           children: [
             JobHeaderCard(job: j, counterpart: 'Client: ${j.client.name}'),
+            if (j.cutImageUrl != null || j.referenceUrl != null)
+              _CutToDo(
+                job: j,
+                onExpired: () => ref.invalidate(jobProvider(widget.jobId)),
+              ),
             const SizedBox(height: Gap.md),
             _ActionPanel(
               job: j,
@@ -84,6 +90,48 @@ class _BarberJobScreenState extends ConsumerState<BarberJobScreen> {
       ),
     );
   }
+}
+
+/// What the client ordered: the catalog cut's picture and their reference photo.
+class _CutToDo extends StatelessWidget {
+  const _CutToDo({required this.job, required this.onExpired});
+
+  final Job job;
+  final VoidCallback onExpired;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    key: const ValueKey('job-cut-pictures'),
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const SectionHeader(title: 'The cut they want'),
+      Row(
+        children: [
+          Expanded(
+            child: job.cutImageUrl == null
+                ? const SizedBox.shrink()
+                : SignedImage(
+                    url: job.cutImageUrl,
+                    aspectRatio: 1,
+                    label: 'THE CUT',
+                    semanticLabel: 'Picture of ${job.cut}',
+                  ),
+          ),
+          const SizedBox(width: Gap.sm + 4),
+          Expanded(
+            child: job.referenceUrl == null
+                ? const SizedBox.shrink()
+                : SignedImage(
+                    url: job.referenceUrl,
+                    aspectRatio: 1,
+                    label: 'THEIR PHOTO',
+                    onExpired: onExpired,
+                  ),
+          ),
+        ],
+      ),
+    ],
+  );
 }
 
 class _ActionPanel extends StatelessWidget {

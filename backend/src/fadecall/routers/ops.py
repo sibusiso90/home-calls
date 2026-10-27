@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, File, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from ..auth import OperatorUser
-from ..deps import DB, Signer
+from ..cuts import cut_photo_key, get_cut
+from ..deps import DB, Signer, Store
 from ..errors import conflict, not_found, validation
+from ..imaging import normalise_photo
 from ..models import Barber, Dispute, Evidence, Job, Payout, Rating, get_by_id
-from ..serializers import barber_json, dispute_json, job_json, payout_json
+from ..serializers import barber_json, cut_json, dispute_json, job_json, payout_json
 from ..services.disputes import resolve_dispute
 from ..services.effects import apply_verdict
 from ..timeutil import iso
@@ -226,3 +228,31 @@ def resolve(
 @router.get("/payouts")
 def payouts(_: OperatorUser, db: DB) -> list[dict[str, Any]]:
     return [payout_json(p) for p in db.scalars(select(Payout).order_by(Payout.created_at.desc()))]
+
+
+@router.put("/cuts/{cut_id}/picture")
+async def set_cut_picture(
+    cut_id: str,
+    user: OperatorUser,
+    storage: Store,
+    signer: Signer,
+    photo: Annotated[UploadFile, File()],
+) -> dict[str, Any]:
+    """Replace a cut's illustration with a real photo. It is public: consent first."""
+    cut = get_cut(cut_id)
+    if cut is None:
+        raise not_found("Cut")
+    await storage.put(cut_photo_key(cut_id), normalise_photo(await photo.read()), "image/jpeg")
+    return cut_json(cut, signer)
+
+
+@router.delete("/cuts/{cut_id}/picture")
+async def clear_cut_picture(
+    cut_id: str, user: OperatorUser, storage: Store, signer: Signer
+) -> dict[str, Any]:
+    """Go back to the illustration."""
+    cut = get_cut(cut_id)
+    if cut is None:
+        raise not_found("Cut")
+    await storage.delete(cut_photo_key(cut_id))
+    return cut_json(cut, signer)
