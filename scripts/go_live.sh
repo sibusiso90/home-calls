@@ -27,7 +27,7 @@ else
   read -r -s -p "Supabase secret key (sb_secret_..., hidden): " sb_key
   echo
   model_key="$(sed -n 's/^MODEL_API_KEY=//p' .env 2>/dev/null || true)"
-  passcode="fade-$(openssl rand -hex 3)"
+  passcode="fade-$(openssl rand -hex 12)"
   umask 077
   {
     echo "DATABASE_URL=$db_url"
