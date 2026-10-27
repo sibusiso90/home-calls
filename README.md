@@ -9,14 +9,13 @@ Fade Call turns a barber's skill into a verified track record. Meta's models gra
 **No verified job, no rating.**
 
 > Entry for the Meta Global AI Developer Hackathon: *Build for Your World*, Indie Developer track.
-> All code in this repository is written during the build window, 27 Oct – 4 Nov 2026.
+> All code in this repository is written during the hackathon window, which opened 26 Oct 2026 at 18:00 SAST and closes 5 Nov 2026 at 04:00 SAST.
 
 ## Status
 
 | Date | State |
 | --- | --- |
-| 26 Oct 2026 | Planning docs only. No application code yet. |
-| 27 Oct 2026 | Build starts: app shell, backend, schema, first model calls. |
+| 26 Oct 2026 | Planning docs. The window opens at 18:00 SAST; the build starts that evening: app shell, backend, schema, model layer (mock until API keys arrive). |
 | 2 Nov 2026 | Feature freeze. |
 | 4 Nov 2026 | Submission. |
 
@@ -67,7 +66,17 @@ Real faces appear only with signed consent. The repository holds code and synthe
 - [Build plan](docs/build-plan.md)
 - [Consent and data](docs/consent-and-data.md)
 - [Decision log](docs/decisions.md)
+- [API contract](docs/api-contract.md)
+- [Meta Model API notes](docs/meta-api-notes.md)
 
 ## Run it
 
-Run steps arrive with the first code, from 27 Oct.
+Needs `uv`, Flutter 3.44+ and ffmpeg.
+
+```sh
+make seed     # synthetic demo data (no real faces)
+make dev      # API on :8000 and the web app in Chrome
+make check    # what CI runs: lint, format, tests, web build
+```
+
+Without `MODEL_API_KEY` the backend runs every model in mock mode, and the app shows a "Mock models" badge. See [backend/README.md](backend/README.md) and [app/README.md](app/README.md).
