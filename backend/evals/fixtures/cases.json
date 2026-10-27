@@ -1,0 +1,47 @@
+{
+  "_comment": "Prompt eval cases. Images are names from fadecall.samples.demo_set() (synthetic, no real faces).",
+  "profile": [
+    {"id": "english", "transcript": "en_thabo.txt", "signed_up_as": "Thabo",
+     "expect": {"area_id": "halfway-house", "years_cutting": 6, "name_contains": "Thabo",
+                "styles_any": ["skin fade", "taper", "line-up"]}},
+    {"id": "isizulu_english", "transcript": "zu_en_sipho.txt", "signed_up_as": "Sipho",
+     "expect": {"area_id": "centurion-central", "years_cutting": 8, "name_contains": "Sipho",
+                "styles_any": ["chiskop", "brush cut", "mid fade"], "languages_any": ["isiZulu"]}},
+    {"id": "sesotho_english", "transcript": "st_en_tumelo.txt", "signed_up_as": "Tumelo",
+     "expect": {"area_id": "irene", "years_cutting": 5, "name_contains": "Tumelo",
+                "styles_any": ["low fade", "taper", "twists"]}}
+  ],
+  "grading": [
+    {"id": "pair_1", "before": "portfolio_1_before.jpg", "after": "portfolio_1_after.jpg"},
+    {"id": "pair_2", "before": "portfolio_2_before.jpg", "after": "portfolio_2_after.jpg"},
+    {"id": "pair_3", "before": "portfolio_3_before.jpg", "after": "portfolio_3_after.jpg"}
+  ],
+  "cut_id": [
+    {"id": "selfie_to_fade", "selfie": "selfie.jpg", "reference": "reference.jpg"}
+  ],
+  "same_person": [
+    {"id": "same_face", "before": "before.jpg", "after": "after.jpg", "expect": {"result_not": "fail"}},
+    {"id": "different_faces", "before": "before.jpg", "after": "after_different_person.jpg",
+     "expect": {"result_not": "pass"}}
+  ],
+  "cut_match": [
+    {"id": "fade_vs_reference", "after": "after.jpg", "reference": "reference.jpg",
+     "cut_name": "Mid skin fade with textured top", "fit_issues": [], "expect": {}}
+  ],
+  "dispute": [
+    {"id": "uneven_fade_clean_evidence",
+     "transcript": "The fade is not even, the left side is higher than the right. I paid for a mid fade.",
+     "text": "Left side higher",
+     "checks": {"same_person": {"result": "pass", "reason": "Same ears and face shape."},
+                "hair_changed": {"result": "pass", "reason": "Hair area down 31%"},
+                "cut_match": {"result": "pass", "reason": "Mid fade visible."}},
+     "expect": {}},
+    {"id": "no_cut_done",
+     "transcript": "Akagundanga nhlobo, he never cut my hair. Ngifuna imali yami, I want my money back.",
+     "text": "",
+     "checks": {"same_person": {"result": "pass", "reason": "Same client."},
+                "hair_changed": {"result": "fail", "reason": "Little visible change: hair area down 1%"},
+                "cut_match": {"result": "uncertain", "reason": "Cannot see a fade."}},
+     "expect": {"outcome_not": "release"}}
+  ]
+}

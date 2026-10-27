@@ -1,0 +1,50 @@
+[project]
+name = "fadecall"
+version = "0.1.0"
+description = "Fade Call backend: verified home-call barbers"
+readme = "README.md"
+authors = [
+    { name = "TME Agent", email = "<tme-agent noreply email>" }
+]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.162.0",
+    "httpx>=0.28.1",
+    "meta-sam-parser>=0.1.0",
+    "numpy>=2.5.4",
+    "openai>=3.38.0",
+    "pillow>=13.0.0",
+    "psycopg[binary]>=3.3.6",
+    "pydantic>=2.14.1",
+    "pydantic-settings>=2.16.1",
+    "python-multipart>=0.0.32",
+    "sqlalchemy>=2",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "modal>=1.6.2",
+    "pytest>=9.1.1",
+    "ruff>=0.17.2",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".data", "samples"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "ASYNC", "C4", "PIE", "PT", "RET"]
+ignore = ["RUF001", "RUF002", "RUF003"]  # en dashes in reasons/docs are intentional
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501", "PT018"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
