@@ -16,6 +16,7 @@ Fade Call turns a barber's skill into a verified track record. Meta's models gra
 | Date | State |
 | --- | --- |
 | 26 Oct 2026 | Planning docs. The window opens at 18:00 SAST; the build starts that evening: app shell, backend, schema, model layer (mock until API keys arrive). |
+| 27 Oct 2026 | All four flows, the operator view, disputes and in-app reminders work end to end against mock models. Next: Postgres, Modal deploy, live Meta models, real phones. |
 | 2 Nov 2026 | Feature freeze. |
 | 4 Nov 2026 | Submission. |
 
@@ -68,6 +69,7 @@ Real faces appear only with signed consent. The repository holds code and synthe
 - [Decision log](docs/decisions.md)
 - [API contract](docs/api-contract.md)
 - [Meta Model API notes](docs/meta-api-notes.md)
+- [Demo video script](docs/demo-script.md)
 
 ## Run it
 
