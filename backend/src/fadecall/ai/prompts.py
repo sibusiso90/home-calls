@@ -12,6 +12,7 @@ import json
 from typing import Any
 
 from ..areas import AREAS
+from ..cuts import CUT_IDS, CUTS, Cut
 
 AREA_IDS = [a.id for a in AREAS]
 AREA_LIST = ", ".join(f"{a.name} ({a.id})" for a in AREAS)
@@ -129,38 +130,73 @@ def grade_user_text() -> str:
 
 
 # ---------------------------------------------------------------------------
-# 3. Cut identification for a client quote (selfie + reference)
+# 3. Client quote: name the cut, time it, and advise on what suits the face
 # ---------------------------------------------------------------------------
 
 CUT_NAME = "cut_identification"
-CUT_SYSTEM = """You quote men's haircuts for home-call barbers in South Africa.
-Image 1 is the client's SELFIE (their current hair). Image 2 is the REFERENCE cut they want.
-A second model has segmented the hair; its coverage numbers are given in the text.
-- cut_name: a short, standard barbershop name for the reference cut, e.g.
-  "Mid skin fade with textured top", "Low taper with line-up", "Chiskop", "Brush cut".
+_CATALOG = "\n".join(f"- {c.id}: {c.name}, {c.minutes} min" for c in CUTS)
+CUT_SYSTEM = f"""You quote men's haircuts for home-call barbers in South Africa and advise
+clients on which cuts suit them.
+Image 1 is always the client's SELFIE (their current hair). The text says how the client chose
+the cut, one of:
+- REFERENCE: image 2 is a photo of the cut they want. Name that cut.
+- CATALOG: they picked a cut from the catalog below. Quote exactly that cut.
+- SUGGEST: they want your recommendation. Pick the catalog cut that best suits them.
+A second model has segmented the hair; its coverage numbers are given in the text for your
+estimate only. The client reads every field, so never mention coverage, percentages or models.
+
+Catalog (id: name, typical minutes):
+{_CATALOG}
+
+Return:
+- cut_name: the cut being quoted. For CATALOG and SUGGEST use the catalog name exactly; for
+  REFERENCE a short, standard barbershop name such as "Mid skin fade with textured top",
+  "Low taper with line-up", "Chiskop", "Brush cut".
+- cut_id: the catalog id of the quoted cut, or "custom" if a reference matches none of them.
 - minutes: realistic time for a skilled barber to do this cut on THIS client at home
   (include washing only if the style needs it). Typical range 20-90.
-- fit_issues: practical problems going from the selfie to the reference, e.g. hair too short
-  for the top, receding hairline affects the line-up, very dense hair adds time. Empty if none.
-- reasons: 1-3 sentences explaining what in the reference identifies the cut and how you
+- fit_issues: practical problems going from the selfie to the cut, e.g. hair too short for the
+  top, receding hairline affects the line-up, very dense hair adds time. Empty if none.
+- reasons: 1-3 sentences on what identifies the cut (or why you picked it) and how you
   estimated the time.
-Talk only about hair. Never identify or describe the person."""
+- face_advice: 1-2 friendly sentences on what tends to suit this client, judged from face
+  shape, hairline and hair texture, and whether the quoted cut is a good match.
+- suggestions: up to 3 catalog cuts that would suit this client best, best first, each with a
+  one-sentence why. Include the quoted cut only if it is one of the best.
+Talk only about hair, face shape and hairline as a barber would. Never identify the person or
+comment on age, race, attractiveness or anything else about them."""
 
+_CUT_ID = {"type": "string", "enum": [*CUT_IDS, "custom"]}
 CUT_SCHEMA = _obj(
     {
         "cut_name": _STR,
+        "cut_id": _CUT_ID,
         "minutes": {"type": "integer", "minimum": 10, "maximum": 180},
         "fit_issues": {"type": "array", "items": _STR},
         "reasons": _STR,
+        "face_advice": _STR,
+        "suggestions": {
+            "type": "array",
+            "items": _obj({"cut_id": {"type": "string", "enum": CUT_IDS}, "why": _STR}),
+        },
     }
 )
 
 
-def cut_user_text(selfie_hair_ratio: float, reference_hair_ratio: float) -> str:
+def cut_user_text(
+    selfie_hair_ratio: float,
+    reference_hair_ratio: float | None = None,
+    chosen: Cut | None = None,
+) -> str:
+    if reference_hair_ratio is not None:
+        return (
+            "Chosen by: REFERENCE. Image 1: SELFIE. Image 2: REFERENCE.\n"
+            f"SAM 3.1 hair coverage: selfie {selfie_hair_ratio:.1%} of frame, "
+            f"reference {reference_hair_ratio:.1%} of frame."
+        )
+    head = f"Chosen by: CATALOG ({chosen.id}: {chosen.name})." if chosen else "Chosen by: SUGGEST."
     return (
-        "Image 1: SELFIE. Image 2: REFERENCE.\n"
-        f"SAM 3.1 hair coverage: selfie {selfie_hair_ratio:.1%} of frame, "
-        f"reference {reference_hair_ratio:.1%} of frame."
+        f"{head} Image 1: SELFIE.\nSAM 3.1 hair coverage: selfie {selfie_hair_ratio:.1%} of frame."
     )
 
 

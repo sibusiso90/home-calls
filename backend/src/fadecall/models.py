@@ -119,11 +119,16 @@ class Quote(Base):
     client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
     area_id: Mapped[str] = mapped_column(String(64))
     cut_name: Mapped[str] = mapped_column(Text)
+    # How the client chose the cut: reference photo, catalog pick, or our suggestion.
+    cut_source: Mapped[str] = mapped_column(String(16), default="reference")
+    cut_id: Mapped[str | None] = mapped_column(String(64))  # catalog id; None for custom
     minutes: Mapped[int] = mapped_column(Integer)
     fit_issues: Mapped[list[str]] = mapped_column(JSONType, default=list)
     reasons: Mapped[str] = mapped_column(Text)
+    face_advice: Mapped[str | None] = mapped_column(Text)
+    suggestions: Mapped[list[dict[str, Any]]] = mapped_column(JSONType, default=list)
     selfie_key: Mapped[str] = mapped_column(Text)
-    reference_key: Mapped[str] = mapped_column(Text)
+    reference_key: Mapped[str | None] = mapped_column(Text)
     selfie_overlay_key: Mapped[str | None] = mapped_column(Text)
     reference_overlay_key: Mapped[str | None] = mapped_column(Text)
     masks: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)

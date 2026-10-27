@@ -9,6 +9,7 @@ from fastapi import APIRouter, File, Form, Query, UploadFile
 from pydantic import BaseModel
 
 from ..auth import ClientUser, CurrentUser
+from ..cuts import CUTS
 from ..deps import DB, Models, Signer, Store
 from ..errors import forbidden, not_found
 from ..models import Barber, Quote, get_by_id
@@ -29,14 +30,47 @@ async def create_quote(
     storage: Store,
     signer: Signer,
     selfie: Annotated[UploadFile, File()],
-    reference: Annotated[UploadFile, File()],
     area_id: Annotated[str, Form()],
+    reference: Annotated[UploadFile | None, File()] = None,
+    cut_id: Annotated[str | None, Form()] = None,
 ) -> dict[str, Any]:
+    """Send a reference photo, or a catalog cut_id, or neither for a suggested cut."""
     client = client_for(db, user)
     quote = await svc.create_quote(
-        db, models, storage, client, area_id, await selfie.read(), await reference.read()
+        db,
+        models,
+        storage,
+        client,
+        area_id,
+        await selfie.read(),
+        await reference.read() if reference is not None else None,
+        cut_id or None,
     )
     return quote_json(quote, signer)
+
+
+@router.get("/cuts")
+def cuts() -> list[dict[str, Any]]:
+    return [c.as_dict() for c in CUTS]
+
+
+class RequoteBody(BaseModel):
+    cut_id: str
+
+
+@router.post("/quotes/{quote_id}/requote")
+async def requote(
+    quote_id: str,
+    body: RequoteBody,
+    user: ClientUser,
+    db: DB,
+    models: Models,
+    storage: Store,
+    signer: Signer,
+) -> dict[str, Any]:
+    """Quote one of the suggested (or any catalog) cuts with the same selfie."""
+    quote = _own_quote(db, user, quote_id)
+    return quote_json(await svc.requote(db, models, storage, quote, body.cut_id), signer)
 
 
 def _own_quote(db: DB, user: CurrentUser, quote_id: str) -> Quote:

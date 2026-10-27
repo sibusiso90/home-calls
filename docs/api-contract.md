@@ -98,19 +98,33 @@ Tier rule: average below 6.5 is `starter` (R250–R320), 6.5 to below 8.0 is `pr
 
 ## Client quote, match and book (role: client)
 
-`POST /quotes` (multipart: `selfie`, `reference` images; `area_id` text field)
+`GET /cuts` lists the cut catalog: `[{"id": "buzz-cut", "name": "Buzz cut", "description": "...", "minutes": 20, "styles": ["buzz cut"]}]`.
+
+`POST /quotes` (multipart: `selfie` image and `area_id` text field, plus how the client chose the cut)
+
+- a `reference` image: the cut in the photo (`cut_source: "reference"`)
+- a catalog `cut_id` text field: that cut (`"catalog"`)
+- neither: Muse Spark picks the catalog cut that suits the client's face (`"suggested"`)
+
+Sending both is a 422. Every quote carries face advice and up to three suggested catalog cuts.
 
 ```json
 {
   "id": "uuid", "cut_name": "Mid skin fade with textured top", "minutes": 50,
+  "cut_source": "reference", "cut_id": "mid-skin-fade-textured",
   "fit_issues": ["Top is short for the textured style; expect a shorter result"],
   "reasons": "Reference shows a mid fade starting at the temple...",
-  "selfie_url": "signed", "reference_url": "signed",
-  "selfie_overlay_url": "signed", "reference_overlay_url": "signed",
+  "face_advice": "An oval face carries most cuts; a clean line-up keeps it sharp.",
+  "suggestions": [{"cut_id": "low-taper-lineup", "name": "Low taper with line-up",
+                   "minutes": 40, "why": "A softer taper suits your hairline."}],
+  "selfie_url": "signed", "reference_url": "signed|null",
+  "selfie_overlay_url": "signed", "reference_overlay_url": "signed|null",
   "area_id": "midrand-central", "elapsed_ms": 8200,
   "model_versions": {"spark": "...", "sam": "..."}
 }
 ```
+
+`POST /quotes/{id}/requote` `{"cut_id": "low-taper-lineup"}` returns a new quote for that catalog cut, reusing the first quote's selfie (no new upload).
 
 The overlay URLs are PNGs of the photo with the SAM 3.1 hair mask tinted on top.
 

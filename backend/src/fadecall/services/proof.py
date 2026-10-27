@@ -142,7 +142,7 @@ async def _verify(
     reference_jpg: bytes | None = None
     quote = db.get(Quote, job.quote_id) if job.quote_id else None
     fit_issues: list[str] = quote.fit_issues if quote else []
-    if quote is not None:
+    if quote is not None and quote.reference_key:
         ref = await storage.get(quote.reference_key)
         reference_jpg = ref[0] if ref else None
 

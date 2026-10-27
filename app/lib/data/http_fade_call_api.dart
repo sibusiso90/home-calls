@@ -221,17 +221,30 @@ final class HttpFadeCallApi implements FadeCallApi {
       GradeResult.fromJson(_obj(await _post('/barbers/me/grade')));
 
   @override
+  Future<List<Cut>> cuts() async => _list(await _get('/cuts'), Cut.fromJson);
+
+  @override
   Future<Quote> createQuote({
     required UploadFile selfie,
-    required UploadFile reference,
     required String areaId,
+    UploadFile? reference,
+    String? cutId,
   }) async => Quote.fromJson(
     _obj(
       await _multipart(
         '/quotes',
-        files: {'selfie': selfie, 'reference': reference},
-        fields: {'area_id': areaId},
+        files: {'selfie': selfie, 'reference': ?reference},
+        fields: {'area_id': areaId, 'cut_id': ?cutId},
       ),
+    ),
+  );
+
+  @override
+  Future<Quote> requote(String quoteId, String cutId) async => Quote.fromJson(
+    _obj(
+      await _post('/quotes/${Uri.encodeComponent(quoteId)}/requote', {
+        'cut_id': cutId,
+      }),
     ),
   );
 

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from ..ai import prompts as P
 from ..ai.types import ModelClient
 from ..areas import AREAS_BY_ID, area_distance_km, get_area
+from ..cuts import Cut, get_cut
 from ..errors import ApiError, conflict, not_found, validation
 from ..imaging import normalise_photo, render_overlay
 from ..models import Barber, Client, Job, Quote, new_id
@@ -32,57 +33,155 @@ async def create_quote(
     client: Client,
     area_id: str,
     selfie: bytes,
-    reference: bytes,
+    reference: bytes | None = None,
+    cut_id: str | None = None,
 ) -> Quote:
+    """Quote from a reference photo, a catalog pick (cut_id) or, with neither, our suggestion."""
     if area_id not in AREAS_BY_ID:
         raise validation(f"area_id {area_id!r} is not a launch suburb")
+    if reference is not None and cut_id:
+        raise validation("Send a reference photo or a cut_id, not both")
+    chosen = _catalog_cut(cut_id)
     started = time.perf_counter()
     selfie_jpg = normalise_photo(selfie, "selfie")
-    ref_jpg = normalise_photo(reference, "reference")
-    seg_selfie, seg_ref = await asyncio.gather(
-        models.segment_hair(selfie_jpg), models.segment_hair(ref_jpg)
+    ref_jpg = normalise_photo(reference, "reference") if reference is not None else None
+    segs = await asyncio.gather(
+        models.segment_hair(selfie_jpg), *([models.segment_hair(ref_jpg)] if ref_jpg else [])
     )
-    data = await models.spark_json(
-        P.CUT_SYSTEM,
-        P.cut_user_text(seg_selfie.area_ratio(), seg_ref.area_ratio()),
-        [selfie_jpg, ref_jpg],
-        P.CUT_SCHEMA,
-        P.CUT_NAME,
-    )
+    seg_selfie, seg_ref = segs[0], segs[1] if ref_jpg else None
     qid = new_id()
     keys = {
         "selfie": f"quotes/{qid}/selfie.jpg",
-        "reference": f"quotes/{qid}/reference.jpg",
         "selfie_overlay": f"quotes/{qid}/selfie-overlay.png",
-        "reference_overlay": f"quotes/{qid}/reference-overlay.png",
     }
-    await asyncio.gather(
+    puts = [
         storage.put(keys["selfie"], selfie_jpg, "image/jpeg"),
-        storage.put(keys["reference"], ref_jpg, "image/jpeg"),
         storage.put(keys["selfie_overlay"], render_overlay(selfie_jpg, seg_selfie), "image/png"),
-        storage.put(keys["reference_overlay"], render_overlay(ref_jpg, seg_ref), "image/png"),
+    ]
+    if ref_jpg is not None and seg_ref is not None:
+        keys["reference"] = f"quotes/{qid}/reference.jpg"
+        keys["reference_overlay"] = f"quotes/{qid}/reference-overlay.png"
+        puts += [
+            storage.put(keys["reference"], ref_jpg, "image/jpeg"),
+            storage.put(keys["reference_overlay"], render_overlay(ref_jpg, seg_ref), "image/png"),
+        ]
+    data, *_ = await asyncio.gather(
+        _ask_spark(
+            models,
+            selfie_jpg,
+            seg_selfie.area_ratio(),
+            ref_jpg,
+            seg_ref.area_ratio() if seg_ref else None,
+            chosen,
+        ),
+        *puts,
     )
-    quote = Quote(
-        id=qid,
-        client_id=client.id,
-        area_id=area_id,
-        cut_name=str(data.get("cut_name") or "Haircut"),
-        minutes=int(data.get("minutes") or 45),
-        fit_issues=[str(x) for x in data.get("fit_issues") or []],
-        reasons=str(data.get("reasons") or ""),
-        selfie_key=keys["selfie"],
-        reference_key=keys["reference"],
-        selfie_overlay_key=keys["selfie_overlay"],
-        reference_overlay_key=keys["reference_overlay"],
-        masks={"selfie": seg_selfie.summary(), "reference": seg_ref.summary()},
-        elapsed_ms=int((time.perf_counter() - started) * 1000),
-        model_versions={"spark": models.versions["spark"], "sam": models.versions["sam"]},
-    )
+    masks = {"selfie": seg_selfie.summary()}
+    if seg_ref is not None:
+        masks["reference"] = seg_ref.summary()
+    source = "reference" if ref_jpg else "catalog" if chosen else "suggested"
+    quote = _new_quote(qid, client, area_id, source, chosen, data, started, models)
+    quote.selfie_key = keys["selfie"]
+    quote.selfie_overlay_key = keys["selfie_overlay"]
+    quote.reference_key = keys.get("reference")
+    quote.reference_overlay_key = keys.get("reference_overlay")
+    quote.masks = masks
     if client.area_id is None:
         client.area_id = area_id
     db.add(quote)
     db.commit()
     return quote
+
+
+async def requote(
+    db: Session, models: ModelClient, storage: Storage, quote: Quote, cut_id: str
+) -> Quote:
+    """A new quote for a catalog cut (usually one we suggested), reusing the same selfie."""
+    chosen = _catalog_cut(cut_id)
+    if chosen is None:
+        raise validation("cut_id is required")
+    stored = await storage.get(quote.selfie_key)
+    if stored is None:
+        raise conflict("The selfie for this quote has expired; start a new quote")
+    started = time.perf_counter()
+    ratio = float((quote.masks or {}).get("selfie", {}).get("area_ratio") or 0.0)
+    data = await _ask_spark(models, stored[0], ratio, None, None, chosen)
+    client = db.get(Client, quote.client_id)
+    if client is None:
+        raise not_found("Client")
+    fresh = _new_quote(new_id(), client, quote.area_id, "catalog", chosen, data, started, models)
+    fresh.selfie_key = quote.selfie_key
+    fresh.selfie_overlay_key = quote.selfie_overlay_key
+    fresh.masks = {"selfie": (quote.masks or {}).get("selfie", {})}
+    db.add(fresh)
+    db.commit()
+    return fresh
+
+
+def _catalog_cut(cut_id: str | None) -> Cut | None:
+    if not cut_id:
+        return None
+    cut = get_cut(cut_id)
+    if cut is None:
+        raise validation(f"cut_id {cut_id!r} is not in the catalog")
+    return cut
+
+
+async def _ask_spark(
+    models: ModelClient,
+    selfie_jpg: bytes,
+    selfie_ratio: float,
+    ref_jpg: bytes | None,
+    ref_ratio: float | None,
+    chosen: Cut | None,
+) -> dict[str, Any]:
+    return await models.spark_json(
+        P.CUT_SYSTEM,
+        P.cut_user_text(selfie_ratio, ref_ratio, chosen),
+        [selfie_jpg, *([ref_jpg] if ref_jpg else [])],
+        P.CUT_SCHEMA,
+        P.CUT_NAME,
+    )
+
+
+def _new_quote(
+    qid: str,
+    client: Client,
+    area_id: str,
+    source: str,
+    chosen: Cut | None,
+    data: dict[str, Any],
+    started: float,
+    models: ModelClient,
+) -> Quote:
+    """The model's answer as a Quote. A catalog pick keeps its own name and id."""
+    picked = chosen or get_cut(str(data.get("cut_id") or ""))
+    if chosen is not None:
+        cut_name = chosen.name
+    elif source == "suggested" and picked is not None:
+        cut_name = picked.name
+    else:
+        cut_name = str(data.get("cut_name") or "Haircut")
+    suggestions = []
+    for s in data.get("suggestions") or []:
+        cut = get_cut(str(s.get("cut_id") or ""))
+        if cut is not None and all(x["cut_id"] != cut.id for x in suggestions):
+            suggestions.append({"cut_id": cut.id, "why": str(s.get("why") or "")})
+    return Quote(
+        id=qid,
+        client_id=client.id,
+        area_id=area_id,
+        cut_name=cut_name,
+        cut_source=source,
+        cut_id=picked.id if picked else None,
+        minutes=int(data.get("minutes") or (picked.minutes if picked else 45)),
+        fit_issues=[str(x) for x in data.get("fit_issues") or []],
+        reasons=str(data.get("reasons") or ""),
+        face_advice=str(data.get("face_advice") or "") or None,
+        suggestions=suggestions[:3],
+        elapsed_ms=int((time.perf_counter() - started) * 1000),
+        model_versions={"spark": models.versions["spark"], "sam": models.versions["sam"]},
+    )
 
 
 def booked_slots(db: Session, barber_id: str) -> list[datetime]:

@@ -89,6 +89,10 @@ final areasProvider = FutureProvider<List<Area>>(
   (ref) => ref.watch(apiProvider).areas(),
 );
 
+final cutsProvider = FutureProvider<List<Cut>>(
+  (ref) => ref.watch(apiProvider).cuts(),
+);
+
 final consentProvider = NotifierProvider.family<ConsentNotifier, bool, String>(
   ConsentNotifier.new,
 );

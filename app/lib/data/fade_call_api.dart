@@ -29,11 +29,19 @@ abstract interface class FadeCallApi {
   Future<GradeResult> grade();
 
   // Client quote, match and book
+  Future<List<Cut>> cuts();
+
+  /// Quote from a [reference] photo, a catalog [cutId], or neither for a
+  /// suggested cut.
   Future<Quote> createQuote({
     required UploadFile selfie,
-    required UploadFile reference,
     required String areaId,
+    UploadFile? reference,
+    String? cutId,
   });
+
+  /// A new quote for a catalog cut with the same selfie as [quoteId].
+  Future<Quote> requote(String quoteId, String cutId);
   Future<Quote> quote(String id);
   Future<List<BarberMatch>> matches(String quoteId);
   Future<Job> createJob({

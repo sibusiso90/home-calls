@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .areas import get_area
+from .cuts import get_cut
 from .models import (
     Barber,
     Dispute,
@@ -90,9 +91,17 @@ def quote_json(q: Quote, s: UrlSigner) -> dict[str, Any]:
     return {
         "id": q.id,
         "cut_name": q.cut_name,
+        "cut_source": q.cut_source,
+        "cut_id": q.cut_id,
         "minutes": q.minutes,
         "fit_issues": q.fit_issues or [],
         "reasons": q.reasons,
+        "face_advice": q.face_advice,
+        "suggestions": [
+            {**s, "name": c.name, "minutes": c.minutes}
+            for s in q.suggestions or []
+            if (c := get_cut(s.get("cut_id"))) is not None
+        ],
         "selfie_url": s.url(q.selfie_key),
         "reference_url": s.url(q.reference_key),
         "selfie_overlay_url": s.url(q.selfie_overlay_key),

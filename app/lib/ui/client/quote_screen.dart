@@ -82,8 +82,9 @@ class _QuoteForm extends ConsumerWidget {
         Text('What are we cutting?', style: context.text.headlineMedium),
         const SizedBox(height: Gap.xs),
         Text(
-          'Send a selfie and a photo of the cut you want. We name the cut, '
-          'estimate the time and price it with travel included.',
+          'Send a selfie, then pick a cut, show us a photo of one, or let us '
+          'suggest what suits your face. We time it and price it with travel '
+          'included.',
           style: context.text.bodyMedium?.copyWith(
             color: context.colors.onSurfaceVariant,
           ),
@@ -109,7 +110,7 @@ class _QuoteForm extends ConsumerWidget {
           ),
           _ => const LinearProgressIndicator(),
         },
-        const SectionHeader(title: 'Your photos'),
+        const SectionHeader(title: 'Your selfie'),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -125,23 +126,85 @@ class _QuoteForm extends ConsumerWidget {
             ),
             const SizedBox(width: Gap.sm + 4),
             Expanded(
-              child: _QuotePhotoTile(
-                title: 'Reference',
-                hint: 'The cut you want',
-                icon: Icons.style_rounded,
-                file: draft.reference,
-                onCamera: () => _pick(ref, selfie: false, camera: true),
-                onGallery: () => _pick(ref, selfie: false, camera: false),
+              child: Padding(
+                padding: const EdgeInsets.only(top: Gap.sm),
+                child: Text(
+                  'Good light, no cap. We use it to read your hairline, hair '
+                  'and face shape, so the advice fits you.',
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.colors.onSurfaceVariant,
+                  ),
+                ),
               ),
             ),
           ],
         ),
+        const SectionHeader(title: 'Your cut'),
+        SegmentedButton<CutChoice>(
+          key: const ValueKey('quote-cut-choice'),
+          segments: const [
+            ButtonSegment(
+              value: CutChoice.catalog,
+              icon: Icon(Icons.format_list_bulleted_rounded),
+              label: Text('From list'),
+            ),
+            ButtonSegment(
+              value: CutChoice.photo,
+              icon: Icon(Icons.style_rounded),
+              label: Text('My photo'),
+            ),
+            ButtonSegment(
+              value: CutChoice.suggest,
+              icon: Icon(Icons.auto_awesome_rounded),
+              label: Text('Suggest'),
+            ),
+          ],
+          selected: {draft.choice},
+          showSelectedIcon: false,
+          onSelectionChanged: (s) => controller.setChoice(s.first),
+        ),
+        const SizedBox(height: Gap.md),
+        switch (draft.choice) {
+          CutChoice.catalog => _CutCatalog(
+            selectedId: draft.cutId,
+            onSelect: controller.setCut,
+          ),
+          CutChoice.photo => Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _QuotePhotoTile(
+                  title: 'Reference',
+                  hint: 'A photo of the exact cut you want',
+                  icon: Icons.style_rounded,
+                  file: draft.reference,
+                  onCamera: () => _pick(ref, selfie: false, camera: true),
+                  onGallery: () => _pick(ref, selfie: false, camera: false),
+                ),
+              ),
+              const SizedBox(width: Gap.sm + 4),
+              const Spacer(),
+            ],
+          ),
+          CutChoice.suggest => const Callout(
+            key: ValueKey('quote-suggest-note'),
+            icon: Icons.auto_awesome_rounded,
+            title: 'Not sure what to get?',
+            text:
+                'We look at your face shape, hairline and hair in the selfie, '
+                'then pick the cut from our list that suits you best.',
+          ),
+        },
         const SizedBox(height: Gap.lg),
         FilledButton.icon(
           key: const ValueKey('quote-submit'),
           onPressed: draft.ready ? () => unawaited(controller.submit()) : null,
           icon: const Icon(Icons.auto_awesome_rounded),
-          label: const Text('Get my quote'),
+          label: Text(
+            draft.choice == CutChoice.suggest
+                ? 'Suggest my cut'
+                : 'Get my quote',
+          ),
         ),
         const SizedBox(height: Gap.sm),
         Text(
@@ -154,6 +217,91 @@ class _QuoteForm extends ConsumerWidget {
       ],
     );
   }
+}
+
+class _CutCatalog extends ConsumerWidget {
+  const _CutCatalog({required this.selectedId, required this.onSelect});
+
+  final String? selectedId;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) =>
+      switch (ref.watch(cutsProvider)) {
+        AsyncData(:final value) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final cut in value)
+              _CutOption(
+                cut: cut,
+                selected: cut.id == selectedId,
+                onTap: () => onSelect(cut.id),
+              ),
+          ],
+        ),
+        AsyncError(:final error) => ErrorView(
+          error: error,
+          onRetry: () => ref.invalidate(cutsProvider),
+        ),
+        _ => const LinearProgressIndicator(),
+      };
+}
+
+class _CutOption extends StatelessWidget {
+  const _CutOption({
+    required this.cut,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Cut cut;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    selected: selected,
+    child: Panel(
+      key: ValueKey('cut-${cut.id}'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: Gap.md,
+        vertical: Gap.sm + 4,
+      ),
+      color: selected ? context.colors.primaryContainer : null,
+      borderColor: selected ? context.colors.primary : null,
+      onTap: onTap,
+      child: Row(
+        children: [
+          Icon(
+            selected
+                ? Icons.radio_button_checked_rounded
+                : Icons.radio_button_unchecked_rounded,
+            color: selected
+                ? context.colors.primary
+                : context.colors.onSurfaceVariant,
+          ),
+          const SizedBox(width: Gap.sm + 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(cut.name, style: context.text.titleSmall),
+                const SizedBox(height: 2),
+                Text(
+                  cut.description,
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: Gap.sm),
+          Text('~${cut.minutes} min', style: context.text.labelMedium),
+        ],
+      ),
+    ),
+  );
 }
 
 class _QuotePhotoTile extends StatelessWidget {
@@ -246,8 +394,8 @@ class _QuoteProgressState extends State<_QuoteProgress> {
 
   static const _messages = [
     'Finding the hair in both photos with SAM 3.1…',
-    'Naming the cut in your reference photo…',
-    'Checking your hair can take this style…',
+    'Reading your hairline and face shape…',
+    'Naming your cut and what suits you…',
     'Estimating time and pricing your home call…',
   ];
 
@@ -336,7 +484,7 @@ class _QuoteError extends StatelessWidget {
       const SizedBox(height: Gap.md),
       FilledButton(onPressed: onRetry, child: const Text('Try again')),
       const SizedBox(height: Gap.sm),
-      OutlinedButton(onPressed: onEdit, child: const Text('Change photos')),
+      OutlinedButton(onPressed: onEdit, child: const Text('Change my choices')),
     ],
   );
 }
@@ -377,7 +525,9 @@ class _QuoteResultState extends ConsumerState<_QuoteResult> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'YOUR CUT',
+                  q.cutSource == CutSource.suggested
+                      ? 'SUGGESTED FOR YOU'
+                      : 'YOUR CUT',
                   style: context.text.labelMedium?.copyWith(
                     color: Palette.brass,
                     letterSpacing: 1.2,
@@ -428,8 +578,29 @@ class _QuoteResultState extends ConsumerState<_QuoteResult> {
           trailing: ModelChip(model: MetaModel.spark),
         ),
         Panel(child: Text(q.reasons, style: context.text.bodyMedium)),
+        if (q.faceAdvice != null || q.suggestions.isNotEmpty) ...[
+          const SectionHeader(
+            title: 'What suits your face',
+            trailing: ModelChip(model: MetaModel.spark),
+          ),
+          if (q.faceAdvice case final advice?)
+            Panel(
+              key: const ValueKey('quote-face-advice'),
+              child: Text(advice, style: context.text.bodyMedium),
+            ),
+          for (final s in q.suggestions)
+            _SuggestionCard(
+              suggestion: s,
+              current: s.cutId == q.cutId,
+              onQuote: () => unawaited(
+                ref.read(quoteControllerProvider.notifier).requote(s.cutId),
+              ),
+            ),
+        ],
         SectionHeader(
-          title: 'Hair found in your photos',
+          title: q.referenceUrl == null
+              ? 'Hair found in your selfie'
+              : 'Hair found in your photos',
           trailing: TextButton(
             onPressed: () => setState(() => _masks = !_masks),
             child: Text(_masks ? 'Show photos' : 'Show hair mask'),
@@ -446,11 +617,13 @@ class _QuoteResultState extends ConsumerState<_QuoteResult> {
             ),
             const SizedBox(width: Gap.sm + 4),
             Expanded(
-              child: SignedImage(
-                url: _masks ? q.referenceOverlayUrl : q.referenceUrl,
-                label: 'REFERENCE',
-                onExpired: _refresh,
-              ),
+              child: q.referenceUrl == null
+                  ? const SizedBox.shrink()
+                  : SignedImage(
+                      url: _masks ? q.referenceOverlayUrl : q.referenceUrl,
+                      label: 'REFERENCE',
+                      onExpired: _refresh,
+                    ),
             ),
           ],
         ),
@@ -486,6 +659,57 @@ class _QuoteResultState extends ConsumerState<_QuoteResult> {
       ],
     );
   }
+}
+
+class _SuggestionCard extends StatelessWidget {
+  const _SuggestionCard({
+    required this.suggestion,
+    required this.current,
+    required this.onQuote,
+  });
+
+  final CutSuggestion suggestion;
+  final bool current;
+  final VoidCallback onQuote;
+
+  @override
+  Widget build(BuildContext context) => Panel(
+    key: ValueKey('suggestion-${suggestion.cutId}'),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(suggestion.name, style: context.text.titleSmall),
+            ),
+            Text('~${suggestion.minutes} min', style: context.text.labelMedium),
+          ],
+        ),
+        const SizedBox(height: Gap.xs),
+        Text(
+          suggestion.why,
+          style: context.text.bodySmall?.copyWith(
+            color: context.colors.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: Gap.sm),
+        Align(
+          alignment: Alignment.centerRight,
+          child: current
+              ? const Chip(
+                  avatar: Icon(Icons.check_rounded, size: 18),
+                  label: Text('Your quote'),
+                  visualDensity: VisualDensity.compact,
+                )
+              : OutlinedButton(
+                  onPressed: onQuote,
+                  child: const Text('Quote this cut'),
+                ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _DarkChip extends StatelessWidget {

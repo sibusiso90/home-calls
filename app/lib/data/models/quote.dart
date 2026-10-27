@@ -1,13 +1,74 @@
 import 'package:fade_call/data/models/barber.dart';
 import 'package:fade_call/data/models/json.dart';
 
+/// How the client chose the cut on a quote.
+enum CutSource {
+  reference,
+  catalog,
+  suggested;
+
+  static CutSource parse(String? raw) =>
+      values.firstWhere((v) => v.name == raw, orElse: () => reference);
+}
+
+/// A cut from the catalog a client can pick instead of sending a photo.
+final class Cut {
+  const Cut({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.minutes,
+    required this.styles,
+  });
+
+  factory Cut.fromJson(Json json) => Cut(
+    id: json.str('id'),
+    name: json.str('name'),
+    description: json.strOrNull('description') ?? '',
+    minutes: json.intOrNull('minutes') ?? 0,
+    styles: json.strings('styles'),
+  );
+
+  final String id;
+  final String name;
+  final String description;
+  final int minutes;
+  final List<String> styles;
+}
+
+/// A catalog cut Muse Spark thinks suits the client's face.
+final class CutSuggestion {
+  const CutSuggestion({
+    required this.cutId,
+    required this.name,
+    required this.minutes,
+    required this.why,
+  });
+
+  factory CutSuggestion.fromJson(Json json) => CutSuggestion(
+    cutId: json.str('cut_id'),
+    name: json.strOrNull('name') ?? '',
+    minutes: json.intOrNull('minutes') ?? 0,
+    why: json.strOrNull('why') ?? '',
+  );
+
+  final String cutId;
+  final String name;
+  final int minutes;
+  final String why;
+}
+
 final class Quote {
   const Quote({
     required this.id,
     required this.cutName,
+    required this.cutSource,
+    required this.cutId,
     required this.minutes,
     required this.fitIssues,
     required this.reasons,
+    required this.faceAdvice,
+    required this.suggestions,
     required this.selfieUrl,
     required this.referenceUrl,
     required this.selfieOverlayUrl,
@@ -20,9 +81,13 @@ final class Quote {
   factory Quote.fromJson(Json json) => Quote(
     id: json.str('id'),
     cutName: json.strOrNull('cut_name') ?? '',
+    cutSource: CutSource.parse(json.strOrNull('cut_source')),
+    cutId: json.strOrNull('cut_id'),
     minutes: json.intOrNull('minutes') ?? 0,
     fitIssues: json.strings('fit_issues'),
     reasons: json.strOrNull('reasons') ?? '',
+    faceAdvice: json.strOrNull('face_advice'),
+    suggestions: json.list('suggestions', CutSuggestion.fromJson),
     selfieUrl: json.strOrNull('selfie_url'),
     referenceUrl: json.strOrNull('reference_url'),
     selfieOverlayUrl: json.strOrNull('selfie_overlay_url'),
@@ -34,9 +99,13 @@ final class Quote {
 
   final String id;
   final String cutName;
+  final CutSource cutSource;
+  final String? cutId;
   final int minutes;
   final List<String> fitIssues;
   final String reasons;
+  final String? faceAdvice;
+  final List<CutSuggestion> suggestions;
   final String? selfieUrl;
   final String? referenceUrl;
   final String? selfieOverlayUrl;

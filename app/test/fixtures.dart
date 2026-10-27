@@ -60,13 +60,30 @@ const gradeJson =
 const quoteJson = '''
 {
   "id": "q-1", "cut_name": "Mid skin fade with textured top", "minutes": 50,
+  "cut_source": "reference", "cut_id": "mid-skin-fade-textured",
   "fit_issues": ["Top is short for the textured style; expect a shorter result"],
   "reasons": "Reference shows a mid fade starting at the temple...",
+  "face_advice": "An oval face carries most cuts; a clean line-up keeps it sharp.",
+  "suggestions": [
+    {"cut_id": "mid-skin-fade-textured", "name": "Mid skin fade with textured top",
+     "minutes": 50, "why": "Height on top balances your jaw."},
+    {"cut_id": "low-taper-lineup", "name": "Low taper with line-up",
+     "minutes": 40, "why": "A softer taper suits your hairline."}
+  ],
   "selfie_url": "/media/s", "reference_url": "/media/r",
   "selfie_overlay_url": "/media/so", "reference_overlay_url": "/media/ro",
   "area_id": "midrand-central", "elapsed_ms": 8200,
   "model_versions": {"spark": "muse-spark-1.3", "sam": "sam-3.1"}
 }''';
+
+const cutsJson = '''
+[
+  {"id": "mid-skin-fade-textured", "name": "Mid skin fade with textured top",
+   "description": "Sides faded to the skin, texture on top.", "minutes": 50,
+   "styles": ["skin fade", "mid fade"]},
+  {"id": "buzz-cut", "name": "Buzz cut", "description": "One clipper length all over.",
+   "minutes": 20, "styles": ["buzz cut"]}
+]''';
 
 const matchesJson = '''
 [{

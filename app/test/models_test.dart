@@ -68,6 +68,17 @@ void main() {
     expect(q.cutName, 'Mid skin fade with textured top');
     expect(q.fitIssues, hasLength(1));
     expect(q.elapsedMs, 8200);
+    expect(q.cutSource, CutSource.reference);
+    expect(q.faceAdvice, contains('oval'));
+    expect(q.suggestions.map((s) => s.cutId), [
+      'mid-skin-fade-textured',
+      'low-taper-lineup',
+    ]);
+    expect(q.suggestions.last.minutes, 40);
+
+    final cuts = decodeList(cutsJson).map(Cut.fromJson).toList();
+    expect(cuts.last.name, 'Buzz cut');
+    expect(cuts.first.styles, contains('mid fade'));
 
     final m = BarberMatch.fromJson(decodeList(matchesJson).single);
     expect(m.barber.thumbnailUrl, isNull);

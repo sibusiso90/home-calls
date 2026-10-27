@@ -25,6 +25,7 @@ from PIL import Image
 
 from ..areas import AREAS
 from ..config import Settings
+from ..cuts import CUTS, get_cut
 from . import prompts as P
 from .sam import encode_sam_line, parse_sam_output
 from .types import Segmentation, Transcript
@@ -75,13 +76,11 @@ NUMBER_WORDS = {
 ZULU_MARKERS = ("sawubona", "igama", "ngi", "ngenza", "sengigunda", "iminyaka")
 SOTHO_MARKERS = ("dumela", "ke nna")
 
-CUTS = [
-    ("Mid skin fade with textured top", 50),
-    ("Low taper with line-up", 40),
-    ("High skin fade with brush cut", 45),
-    ("Chiskop with beard line-up", 30),
-    ("Drop fade with waves", 55),
-    ("Burst fade with twists", 70),
+FACE_ADVICE = [
+    "Your face is fairly round, so height on top with tight sides will lengthen it.",
+    "You have an oval face, which carries most cuts; a clean line-up keeps it sharp.",
+    "A strong, square jaw suits short sides and a crisp line-up to frame it.",
+    "Your hairline sits a little high, so a softer line-up will look more natural.",
 ]
 GRADE_REASONS = {
     "fade_blend": [
@@ -267,10 +266,21 @@ class MockModelClient:
         return {"scores": scores, "reasons": reasons}
 
     def _cut(self, user_text: str, images: list[bytes]) -> dict[str, Any]:
-        ref = images[1] if len(images) > 1 else images[0]
-        seed = _h(ref)
-        cut_name, minutes = CUTS[seed % len(CUTS)]
-        minutes += (seed >> 8) % 3 * 5
+        face = _h(images[0])
+        m = re.search(r"CATALOG \(([\w-]+):", user_text)
+        if "REFERENCE" in user_text and len(images) > 1:
+            seed = _h(images[1])
+            cut = CUTS[seed % len(CUTS)]
+            why = "Reference shows the sides taken down close to the skin with a defined top"
+        else:
+            seed = face
+            cut = get_cut(m.group(1)) if m else None
+            if cut is not None:
+                why = f"You picked the {cut.name.lower()} from the list"
+            else:
+                cut = CUTS[face % len(CUTS)]
+                why = f"A {cut.name.lower()} suits your face shape and hair density best"
+        minutes = cut.minutes + (seed >> 8) % 3 * 5
         ratios = [float(x) for x in re.findall(r"([\d.]+)% of frame", user_text)]
         fit_issues: list[str] = []
         if len(ratios) == 2 and ratios[0] < ratios[1] * 0.8:
@@ -280,15 +290,18 @@ class MockModelClient:
         if (seed >> 16) % 4 == 0:
             fit_issues.append("Dense hair on the crown adds about 10 minutes of thinning")
             minutes += 10
+        picks = [CUTS[(face + i * 3) % len(CUTS)] for i in range(3)]
         return {
-            "cut_name": cut_name,
+            "cut_name": cut.name,
+            "cut_id": cut.id,
             "minutes": minutes,
             "fit_issues": fit_issues,
-            "reasons": (
-                f"Reference shows the sides taken down close to the skin with a defined "
-                f"top, which matches a {cut_name.lower()}. Estimated {minutes} minutes for a "
-                f"home call including the line-up."
-            ),
+            "reasons": f"{why}. Estimated {minutes} minutes for a home call including the line-up.",
+            "face_advice": FACE_ADVICE[(face >> 4) % len(FACE_ADVICE)],
+            "suggestions": [
+                {"cut_id": c.id, "why": f"The {c.name.lower()} works with your hairline."}
+                for c in picks
+            ],
         }
 
     def _same_person(self, _: str, images: list[bytes]) -> dict[str, Any]:

@@ -13,7 +13,7 @@ Nine days, 27 Oct – 4 Nov 2026 (SAST). Proof of job is built first because it 
 - [x] Flutter web app shell: login, barber and client roles
 - [x] Live-camera capture screen with timestamp and GPS
 - [~] FastAPI backend on Modal with a health endpoint (backend runs locally; Modal app written, not deployed)
-- [~] Meta Model API hello-world: one vision call, one transcription call, one SAM 3.1 call (`fadecall.smoke` ready; waiting on the API key)
+- [x] Meta Model API hello-world: one vision call, one transcription call, one SAM 3.1 call (`fadecall.smoke` passed live on 27 Oct; all 12 prompt evals pass live)
 - [x] Postgres schema: barbers, portfolio_items, clients, jobs, evidence, ratings, disputes (migrations written; not yet applied to Supabase)
 
 ## Wed 28 Oct: proof of job
@@ -30,7 +30,8 @@ Nine days, 27 Oct – 4 Nov 2026 (SAST). Proof of job is built first because it 
 
 ## Fri 30 Oct: quote and match
 
-- [~] Selfie and reference photo to named cut, minutes and price with travel band (built in mock mode; live untested)
+- [x] Selfie and reference photo to named cut, minutes and price with travel band (live-tested 27 Oct)
+- [x] Cut from a catalog list or a suggested cut, with face-shape advice and "quote this cut instead" (added 27 Oct; live-tested)
 - [x] Ranking by tier, verified jobs, rating and distance
 - [x] Booking confirmation and reminders (in-app; also cancel and reschedule)
 

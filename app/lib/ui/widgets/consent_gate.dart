@@ -13,7 +13,7 @@ enum ConsentTopic {
     'We never build a face database or search faces across jobs.',
   ]),
   quotePhotos('quote_photos', 'Before you take photos', [
-    'Your selfie and reference photo are used only to name the cut and price this quote.',
+    'Your photos are used only to name or suggest a cut for your face shape and hair, and price this quote.',
     'They are stored privately and shown only through short-lived links.',
     'Faces are never searched, matched to other people or made public.',
   ]),
