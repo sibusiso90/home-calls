@@ -19,7 +19,12 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
         with:
           enable-cache: true
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      # Static build from GitHub releases; apt mirrors have stalled for 30+ min.
+      - name: Install ffmpeg
+        run: |
+          curl -fsSL --retry 3 https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-linux64-gpl-9.0.tar.xz \
+            | tar -xJ -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/ffmpeg-n9.0-latest-linux64-gpl-9.0/bin" >> "$GITHUB_PATH"
       - run: uv sync --locked
       - run: uv run ruff check
       - run: uv run ruff format --check
