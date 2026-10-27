@@ -112,10 +112,12 @@ def book(client: Api, barber: Api, quote_id: str, barber_id: str, slot: str) -> 
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--base", default="http://localhost:8000")
-    parser.add_argument("--passcode", default="fadecall-local", help="OPERATOR_PASSCODE of the target")
-    parser.add_argument("--allow-mock", action="store_true", help="run even if the API is on mock models")
+    parser.add_argument("--passcode", default="fadecall-local", help="target's OPERATOR_PASSCODE")
+    parser.add_argument("--allow-mock", action="store_true", help="run on mock models too")
     args = parser.parse_args()
 
     api = Api(args.base)
@@ -138,7 +140,7 @@ def main() -> int:
         profile = note["profile"]
         profile["area_id"] = profile.get("area_id") or "midrand-central"
         barber.call("PUT", "/barbers/me/profile", json=profile)
-        s.note = f"{profile.get('name')}, {profile.get('years_cutting')} yrs, {profile.get('area_id')}"
+        s.note = f"{profile.get('name')}, {profile.get('years_cutting')} yrs, {profile['area_id']}"
 
     with Step("portfolio x5 -> grade") as s:
         for i in range(1, 6):
@@ -163,18 +165,19 @@ def main() -> int:
         }
         quote = client.call("POST", "/quotes", data={"area_id": "midrand-central"}, files=files)
         state["quote"] = quote
-        s.note = f"{len(cuts)} cuts; '{quote['cut_name']}' {quote['minutes']} min, {quote['elapsed_ms']} ms"
+        s.note = f"{len(cuts)} cuts; '{quote['cut_name']}', {quote['minutes']} min"
 
     with Step("re-quote a suggested cut") as s:
         suggestion = state["quote"]["suggestions"][0]["cut_id"]
-        requote = client.call("POST", f"/quotes/{state['quote']['id']}/requote", json={"cut_id": suggestion})
+        path = f"/quotes/{state['quote']['id']}/requote"
+        requote = client.call("POST", path, json={"cut_id": suggestion})
         state["quote"] = requote
         s.note = f"'{requote['cut_name']}' advice: {requote['face_advice'][:60]}"
 
     with Step("matches include the new barber") as s:
         matches = client.call("GET", f"/quotes/{state['quote']['id']}/matches")
         mine = next(m for m in matches if m["barber"]["id"] == state["barber_id"])
-        s.note = f"{len(matches)} matches; ours R{mine['price']['total_zar']} band {mine['travel_band']}"
+        s.note = f"{len(matches)} matches; ours R{mine['price']['total_zar']}"
 
     with Step("book two slots, confirm, deposit") as s:
         slots = client.call("GET", f"/barbers/{state['barber_id']}/slots?days=7")
@@ -194,7 +197,8 @@ def main() -> int:
         if state["verdict1"] != "pass":
             body = {"verdict": "pass", "reason": "E2E: reviewed photos"}
             operator.call("POST", f"/ops/jobs/{state['job1']['id']}/verdict", json=body)
-        client.call("POST", f"/jobs/{state['job1']['id']}/rating", json={"stars": 5, "comment": "Clean fade"})
+        rating = {"stars": 5, "comment": "Clean fade"}
+        client.call("POST", f"/jobs/{state['job1']['id']}/rating", json=rating)
         s.note = "operator review needed" if state["verdict1"] != "pass" else "model passed it"
 
     with Step("job 2 proof: different person") as s:

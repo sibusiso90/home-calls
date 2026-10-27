@@ -18,15 +18,15 @@ Nine days, 27 Oct – 4 Nov 2026 (SAST). Proof of job is built first because it 
 
 ## Wed 28 Oct: proof of job
 
-- [~] Before/after pipeline: SAM 3.1 hair masks, same-person check, cut-match check (built and tested in mock mode; live untested)
+- [x] Before/after pipeline: SAM 3.1 hair masks, same-person check, cut-match check (live E2E 27 Oct on synthetic faces; real photos still to test)
 - [x] Evidence record per job: images, masks, model reasons, verdict
 - [x] Verdict gates payment release and rating insert
 - [~] Camera and GPS tested on Android Chrome and iPhone Safari
 
 ## Thu 29 Oct: onboarding
 
-- [~] Voice note to profile: transcribe, extract fields, confirm back to the barber (built in mock mode; isiZulu untested)
-- [~] Portfolio grading: 5 photo pairs to scores, reasons, tier and price band (built in mock mode; live untested)
+- [~] Voice note to profile: transcribe, extract fields, confirm back to the barber (live with spoken English 27 Oct; isiZulu needs a real recording)
+- [x] Portfolio grading: 5 photo pairs to scores, reasons, tier and price band (live E2E 27 Oct)
 
 ## Fri 30 Oct: quote and match
 
@@ -43,7 +43,7 @@ Nine days, 27 Oct – 4 Nov 2026 (SAST). Proof of job is built first because it 
 
 ## Mon 2 Nov: freeze
 
-- [~] Dispute flow: voice complaint to case summary (built in mock mode; live untested)
+- [x] Dispute flow: voice complaint to case summary (live E2E 27 Oct)
 - [ ] Stretch: WhatsApp booking reminders, only if ahead of plan (sender written, off until WhatsApp credentials exist)
 - [ ] Bug fixes only after 18:00; feature freeze
 

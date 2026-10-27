@@ -18,3 +18,8 @@ Fade Call handles faces and voices, so these rules apply from the first commit.
 
 - The same-person check compares the before and after photos within one job only.
 - No face database, no search across jobs, no identification.
+
+## Face-shape advice
+
+- A quote may describe the client's face shape and hairline to recommend cuts. This is covered by the consent shown before the selfie.
+- The prompt limits the advice to hair, face shape and hairline. It never identifies the person or comments on age, race or attractiveness.
