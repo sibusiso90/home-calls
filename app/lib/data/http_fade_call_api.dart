@@ -249,6 +249,63 @@ final class HttpFadeCallApi implements FadeCallApi {
   );
 
   @override
+  Future<HomeCallRequest> createRequest({
+    required String quoteId,
+    required DateTime day,
+    required List<TimeWindow> windows,
+    required String address,
+    required double lat,
+    required double lng,
+    String? barberId,
+  }) async => HomeCallRequest.fromJson(
+    _obj(
+      await _post('/requests', {
+        'quote_id': quoteId,
+        'day': _date(day),
+        'windows': [for (final w in windows) w.name],
+        'address': address,
+        'lat': lat,
+        'lng': lng,
+        'barber_id': barberId,
+      }),
+    ),
+  );
+
+  static String _date(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  @override
+  Future<List<HomeCallRequest>> requests() async =>
+      _list(await _get('/requests'), HomeCallRequest.fromJson);
+
+  @override
+  Future<HomeCallRequest> request(String id) async => HomeCallRequest.fromJson(
+    _obj(await _get('/requests/${Uri.encodeComponent(id)}')),
+  );
+
+  @override
+  Future<Job> acceptRequest(String id, {required DateTime slotStart}) async =>
+      Job.fromJson(
+        _obj(
+          await _post('/requests/${Uri.encodeComponent(id)}/accept', {
+            'slot_start': isoWithOffset(slotStart),
+          }),
+        ),
+      );
+
+  @override
+  Future<void> declineRequest(String id) async {
+    await _post('/requests/${Uri.encodeComponent(id)}/decline');
+  }
+
+  @override
+  Future<HomeCallRequest> cancelRequest(String id) async =>
+      HomeCallRequest.fromJson(
+        _obj(await _post('/requests/${Uri.encodeComponent(id)}/cancel')),
+      );
+
+  @override
   Future<Quote> quote(String id) async =>
       Quote.fromJson(_obj(await _get('/quotes/${Uri.encodeComponent(id)}')));
 

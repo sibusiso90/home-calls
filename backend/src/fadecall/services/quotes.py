@@ -238,7 +238,10 @@ def book_job(
     address: str,
     lat: float,
     lng: float,
+    accepted: bool = False,
 ) -> Job:
+    """Book a slot. `accepted` means the barber chose it from a request: the job is
+    confirmed straight away and the request flow sends its own notifications."""
     quote = db.get(Quote, quote_id)
     if quote is None or quote.client_id != client.id:
         raise not_found("Quote")
@@ -273,13 +276,15 @@ def book_job(
         address=address.strip(),
         lat=lat,
         lng=lng,
-        status="booked",
+        status="confirmed" if accepted else "booked",
         payment_status="deposit_pending",
         deposit_url=f"https://pay.example/mock/{job_id}",
     )
     db.add(job)
     db.flush()
     db.refresh(job)
+    if accepted:
+        return job
     notify(
         db,
         [client.user_id],

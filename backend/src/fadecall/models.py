@@ -187,6 +187,38 @@ class Job(Base):
     )
 
 
+class BookingRequest(Base):
+    """A client's ask for a cut on a day, in one or more time windows.
+
+    Offered first to the chosen barber for a few minutes, then to every barber in
+    range. The barber who accepts picks the start time, which creates the Job.
+    """
+
+    __tablename__ = "booking_requests"
+
+    id: Mapped[str] = _id_col()
+    quote_id: Mapped[str] = mapped_column(ForeignKey("quotes.id"))
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
+    day: Mapped[str] = mapped_column(String(10))  # YYYY-MM-DD, South African date
+    windows: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    address: Mapped[str] = mapped_column(Text)
+    lat: Mapped[float] = mapped_column(Float)
+    lng: Mapped[float] = mapped_column(Float)
+    chosen_barber_id: Mapped[str | None] = mapped_column(ForeignKey("barbers.id"))
+    offered_until: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    broadcast_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    declined_by: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    status: Mapped[str] = mapped_column(String(16), default="open")
+    job_id: Mapped[str | None] = mapped_column(ForeignKey("jobs.id"))
+    closed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    created_at: Mapped[datetime] = _created()
+
+    quote: Mapped[Quote] = relationship()
+    client: Mapped[Client] = relationship()
+    chosen_barber: Mapped[Barber | None] = relationship()
+    job: Mapped[Job | None] = relationship()
+
+
 class Evidence(Base):
     __tablename__ = "evidence"
 
@@ -287,6 +319,9 @@ class Notification(Base):
     id: Mapped[str] = _id_col()
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     job_id: Mapped[str | None] = mapped_column(ForeignKey("jobs.id", ondelete="SET NULL"))
+    request_id: Mapped[str | None] = mapped_column(
+        ForeignKey("booking_requests.id", ondelete="SET NULL")
+    )
     kind: Mapped[str] = mapped_column(String(32))
     title: Mapped[str] = mapped_column(String(160))
     body: Mapped[str] = mapped_column(Text, default="")

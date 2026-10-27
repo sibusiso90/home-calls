@@ -13,6 +13,9 @@ enum NotificationKind {
   jobCancelled('job_cancelled'),
   jobRescheduled('job_rescheduled'),
   reminder('reminder'),
+  requestNew('request_new'),
+  requestAccepted('request_accepted'),
+  requestUpdate('request_update'),
   other('other');
 
   const NotificationKind(this.wire);
@@ -27,6 +30,7 @@ final class AppNotification {
     required this.id,
     required this.jobId,
     required this.kind,
+    this.requestId,
     required this.title,
     required this.body,
     required this.createdAt,
@@ -36,6 +40,7 @@ final class AppNotification {
   factory AppNotification.fromJson(Json json) => AppNotification(
     id: json.str('id'),
     jobId: json.strOrNull('job_id'),
+    requestId: json.strOrNull('request_id'),
     kind: NotificationKind.parse(json.strOrNull('kind')),
     title: json.strOrNull('title') ?? '',
     body: json.strOrNull('body') ?? '',
@@ -45,6 +50,7 @@ final class AppNotification {
 
   final String id;
   final String? jobId;
+  final String? requestId;
   final NotificationKind kind;
   final String title;
   final String body;

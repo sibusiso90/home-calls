@@ -20,7 +20,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from ..config import Settings
-from ..models import Job, Notification, User
+from ..models import BookingRequest, Job, Notification, User
 from ..timeutil import SAST, ensure_utc, utcnow
 
 log = logging.getLogger("fadecall.notifications")
@@ -37,6 +37,9 @@ KINDS = (
     "job_cancelled",
     "job_rescheduled",
     "reminder",
+    "request_new",
+    "request_accepted",
+    "request_update",
 )
 
 
@@ -135,6 +138,7 @@ def notify(
     title: str,
     body: str,
     job: Job | None = None,
+    request: BookingRequest | None = None,
 ) -> list[Notification]:
     """Write one inbox row per user (deduplicated) and fan out to external channels.
 
@@ -149,7 +153,12 @@ def notify(
             continue
         seen.add(uid)
         row = Notification(
-            user_id=uid, job_id=job.id if job else None, kind=kind, title=title, body=body
+            user_id=uid,
+            job_id=job.id if job else None,
+            request_id=request.id if request else None,
+            kind=kind,
+            title=title,
+            body=body,
         )
         db.add(row)
         rows.append(row)

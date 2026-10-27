@@ -12,6 +12,7 @@ from ..errors import not_found
 from ..models import Notification, get_by_id
 from ..serializers import notification_json
 from ..services import notifications as svc
+from ..services import requests as requests_svc
 from ..timeutil import utcnow
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -21,6 +22,8 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 def list_notifications(
     user: CurrentUser, db: DB, limit: int = Query(50, ge=1, le=200)
 ) -> dict[str, Any]:
+    # The app polls this, so it doubles as the clock for request offers timing out.
+    requests_svc.sweep(db)
     items, unread = svc.inbox(db, user.id, limit)
     return {"items": [notification_json(n) for n in items], "unread_count": unread}
 

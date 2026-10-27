@@ -66,6 +66,8 @@ class NotificationsNotifier extends AsyncNotifier<NotificationInbox> {
   void _refreshJobsFor(NotificationInbox? before, NotificationInbox after) {
     if (before == null) return;
     final seen = {for (final n in before.items) n.id};
+    final fresh = after.items.where((n) => !seen.contains(n.id));
+    if (fresh.any((n) => n.requestId != null)) ref.invalidate(requestsProvider);
     final changed = {
       for (final n in after.items)
         if (!seen.contains(n.id) && n.jobId != null) n.jobId!,

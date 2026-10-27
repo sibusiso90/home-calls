@@ -58,6 +58,8 @@ Future<void> showNotificationsSheet(BuildContext context) {
 String? notificationTarget(Role role, AppNotification n) => switch (role) {
   Role.client when n.jobId != null => Routes.clientJob(n.jobId!),
   Role.barber when n.jobId != null => Routes.barberJob(n.jobId!),
+  Role.client when n.requestId != null => Routes.clientBookings,
+  Role.barber when n.requestId != null => Routes.barberJobs,
   Role.operator => switch (n.kind) {
     NotificationKind.disputeOpened ||
     NotificationKind.disputeResolved => Routes.opsDisputes,
@@ -162,6 +164,11 @@ class NotificationTile extends StatelessWidget {
           context.status.fail,
         ),
         NotificationKind.reminder => (Icons.alarm_rounded, Palette.brass),
+        NotificationKind.requestNew => (Icons.campaign_outlined, Palette.brass),
+        NotificationKind.requestAccepted => (
+          Icons.check_circle_rounded,
+          context.status.pass,
+        ),
         NotificationKind.jobRescheduled => (
           Icons.update_rounded,
           Palette.brass,

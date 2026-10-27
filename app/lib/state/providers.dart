@@ -152,6 +152,12 @@ final barberSlotsProvider = FutureProvider.family<List<DateTime>, SlotQuery>(
       ),
 );
 
+/// Client: their requests. Barber: open requests offered to them.
+final requestsProvider = FutureProvider<List<HomeCallRequest>>((ref) {
+  ref.watch(currentUserIdProvider);
+  return ref.watch(apiProvider).requests();
+});
+
 final matchesProvider = FutureProvider.family<List<BarberMatch>, String>(
   (ref, quoteId) => ref.watch(apiProvider).matches(quoteId),
 );
@@ -161,7 +167,8 @@ final matchesProvider = FutureProvider.family<List<BarberMatch>, String>(
 void refreshJobIn(ProviderContainer container, String id) {
   container
     ..invalidate(jobProvider(id))
-    ..invalidate(jobsProvider);
+    ..invalidate(jobsProvider)
+    ..invalidate(requestsProvider);
 }
 
 extension RefreshX on WidgetRef {

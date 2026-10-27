@@ -113,6 +113,27 @@ def send_reminders() -> None:
     print(f"Sent reminders for {len(sent)} job(s)")
 
 
+@app.function(secrets=secrets, schedule=modal.Period(minutes=1), timeout=60)
+def sweep_requests() -> None:
+    """Every minute: pass lapsed 10-minute offers to all nearby barbers, expire dead requests.
+
+    The API also sweeps whenever anyone polls notifications; this covers quiet periods.
+    """
+    from fadecall.config import get_settings
+    from fadecall.db import make_engine, make_sessionmaker
+    from fadecall.services import notifications
+    from fadecall.services.requests import sweep
+
+    settings = get_settings()
+    notifications.configure(settings)
+    engine = make_engine(settings.sqlalchemy_url)
+    try:
+        with make_sessionmaker(engine)() as db:
+            print(f"Swept {sweep(db)} request(s)")
+    finally:
+        engine.dispose()
+
+
 @app.function(secrets=secrets, timeout=300)
 def smoke() -> None:
     """One live call per model from inside the deployed image (needs MODEL_API_KEY).

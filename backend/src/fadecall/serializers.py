@@ -221,6 +221,7 @@ def notification_json(n: Notification) -> dict[str, Any]:
     return {
         "id": n.id,
         "job_id": n.job_id,
+        "request_id": n.request_id,
         "kind": n.kind,
         "title": n.title,
         "body": n.body,

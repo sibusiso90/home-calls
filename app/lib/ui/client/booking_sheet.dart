@@ -6,7 +6,6 @@ import 'package:fade_call/router.dart';
 import 'package:fade_call/state/providers.dart';
 import 'package:fade_call/ui/widgets/badges.dart';
 import 'package:fade_call/ui/widgets/common.dart';
-import 'package:fade_call/ui/widgets/slot_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,7 +13,7 @@ import 'package:go_router/go_router.dart';
 Future<void> showBookingSheet(
   BuildContext context, {
   required String quoteId,
-  required BarberMatch match,
+  required BarberMatch? match,
   required String? areaId,
   int? minutes,
 }) => showModalBottomSheet<void>(
@@ -31,6 +30,11 @@ Future<void> showBookingSheet(
   ),
 );
 
+/// The client asks for a home call on a day, in one or more time windows.
+///
+/// With a [match], that barber has 10 minutes to accept before every barber in
+/// range is asked; without one, everyone in range is asked straight away. The
+/// barber who accepts picks the exact start time.
 class BookingSheet extends ConsumerStatefulWidget {
   const BookingSheet({
     required this.quoteId,
@@ -41,7 +45,7 @@ class BookingSheet extends ConsumerStatefulWidget {
   });
 
   final String quoteId;
-  final BarberMatch match;
+  final BarberMatch? match;
   final String? areaId;
 
   /// The quoted cut's length, so only times it fits into are offered.
@@ -56,17 +60,35 @@ enum _LocationSource { device, area }
 class _BookingSheetState extends ConsumerState<BookingSheet> {
   final _address = TextEditingController();
   ({double lat, double lng, _LocationSource source, double? accuracy})? _point;
-  late DateTime? _slot = widget.match.nextSlot;
+  final DateTime _now = DateTime.now();
+  late DateTime _day = _firstDay();
+  final Set<TimeWindow> _windows = {};
   bool _locating = false;
   bool _booking = false;
   String? _error;
   String? _locationNote;
 
-  SlotQuery get _slotQuery => (
-    barberId: widget.match.barber.id,
-    minutes: widget.minutes ?? 45,
-    excludeJobId: null,
-  );
+  List<DateTime> get _days => [
+    for (var i = 0; i < 7; i++)
+      DateTime(_now.year, _now.month, _now.day).add(Duration(days: i)),
+  ];
+
+  bool _hasWindow(DateTime day) =>
+      TimeWindow.values.any((w) => w.open(day, _now));
+
+  DateTime _firstDay() => _days.firstWhere(_hasWindow);
+
+  void _pickDay(DateTime day) => setState(() {
+    _day = day;
+    _windows.removeWhere((w) => !w.open(day, _now));
+  });
+
+  String _dayLabel(DateTime day) =>
+      switch (day.difference(_days.first).inDays) {
+        0 => 'Today',
+        1 => 'Tomorrow',
+        _ => formatDay(day),
+      };
 
   @override
   void initState() {
@@ -124,13 +146,14 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
 
   Future<void> _book() async {
     final point = _point;
-    final slot = _slot;
-    if (_address.text.trim().length < 5) {
-      setState(() => _error = 'Enter the street address for the barber.');
+    if (_windows.isEmpty) {
+      setState(
+        () => _error = 'Pick when suits you: morning, afternoon or evening.',
+      );
       return;
     }
-    if (slot == null) {
-      setState(() => _error = 'Pick a time for the cut.');
+    if (_address.text.trim().length < 5) {
+      setState(() => _error = 'Enter the street address for the barber.');
       return;
     }
     if (point == null) {
@@ -142,23 +165,31 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
       _error = null;
     });
     try {
-      final job = await ref
+      await ref
           .read(apiProvider)
-          .createJob(
+          .createRequest(
             quoteId: widget.quoteId,
-            barberId: widget.match.barber.id,
-            slotStart: slot,
+            day: _day,
+            windows: [
+              for (final w in TimeWindow.values)
+                if (_windows.contains(w)) w,
+            ],
             address: _address.text.trim(),
             lat: point.lat,
             lng: point.lng,
+            barberId: widget.match?.barber.id,
           );
-      ref.invalidate(jobsProvider);
+      ref.invalidate(requestsProvider);
       if (!mounted) return;
       Navigator.of(context).pop();
-      GoRouter.of(context).go(Routes.clientJob(job.id, confirmed: true));
+      GoRouter.of(context).go(Routes.clientBookings);
+      showSnack(
+        context,
+        widget.match == null
+            ? 'Request sent to barbers near you.'
+            : 'Request sent to ${widget.match!.barber.name}.',
+      );
     } on Object catch (e) {
-      // The time may have just been taken: show what is still free.
-      ref.invalidate(barberSlotsProvider(_slotQuery));
       if (mounted) setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) setState(() => _booking = false);
@@ -181,49 +212,72 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Book ${m.barber.name}', style: context.text.headlineSmall),
-            const SizedBox(height: Gap.xs),
-            Row(
-              children: [
-                TierBadge(tier: m.barber.tier),
-                const SizedBox(width: Gap.sm),
-                Text(
-                  rand(m.price.totalZar),
-                  style: context.text.titleLarge?.copyWith(
-                    color: context.colors.primary,
-                  ),
-                ),
-              ],
+            Text(
+              m == null ? 'Ask barbers near you' : 'Ask ${m.barber.name}',
+              style: context.text.headlineSmall,
             ),
-            const SizedBox(height: Gap.lg),
-            Row(
-              children: [
-                Icon(Icons.event_rounded, color: context.colors.primary),
-                const SizedBox(width: Gap.sm),
-                Expanded(
-                  child: Text(
-                    _slot == null ? 'Pick a time' : formatSlot(_slot),
-                    key: const ValueKey('booking-slot'),
-                    style: context.text.titleMedium,
+            const SizedBox(height: Gap.xs),
+            if (m != null)
+              Row(
+                children: [
+                  TierBadge(tier: m.barber.tier),
+                  const SizedBox(width: Gap.sm),
+                  Text(
+                    rand(m.price.totalZar),
+                    style: context.text.titleLarge?.copyWith(
+                      color: context.colors.primary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              )
+            else
+              Text(
+                'Every verified barber in range gets it. Price depends on '
+                'who takes it; you see it before you pay.',
+                style: context.text.bodySmall,
+              ),
+            const SizedBox(height: Gap.lg),
+            Text('Which day?', style: context.text.titleSmall),
+            const SizedBox(height: Gap.sm),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final d in _days) ...[
+                    ChoiceChip(
+                      label: Text(_dayLabel(d)),
+                      selected: d == _day,
+                      onSelected: _hasWindow(d) ? (_) => _pickDay(d) : null,
+                    ),
+                    const SizedBox(width: Gap.sm),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: Gap.md),
+            Text('When suits you?', style: context.text.titleSmall),
+            const SizedBox(height: Gap.xs),
+            Text(
+              'Pick one or more. The barber who takes the job sets the exact time.',
+              style: context.text.bodySmall,
             ),
             const SizedBox(height: Gap.sm),
-            AsyncView(
-              value: ref.watch(barberSlotsProvider(_slotQuery)),
-              onRetry: () => ref.invalidate(barberSlotsProvider(_slotQuery)),
-              isEmpty: (s) => s.isEmpty,
-              empty: const MessageView(
-                icon: Icons.event_busy_rounded,
-                title: 'No free times',
-                message: 'This barber is fully booked for the next two weeks.',
-              ),
-              builder: (slots) => SlotPicker(
-                slots: slots,
-                selected: _slot,
-                onSelected: (s) => setState(() => _slot = s),
-              ),
+            Wrap(
+              spacing: Gap.sm,
+              runSpacing: Gap.sm,
+              children: [
+                for (final w in TimeWindow.values)
+                  FilterChip(
+                    key: ValueKey('window-${w.name}'),
+                    label: Text('${w.label} ${w.hours}'),
+                    selected: _windows.contains(w),
+                    onSelected: w.open(_day, _now)
+                        ? (on) => setState(
+                            () => on ? _windows.add(w) : _windows.remove(w),
+                          )
+                        : null,
+                  ),
+              ],
             ),
             const SizedBox(height: Gap.md),
             TextField(
@@ -296,12 +350,20 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                         color: Colors.white,
                       ),
                     )
-                  : Text('Confirm booking · ${rand(m.price.totalZar)}'),
+                  : Text(
+                      m == null
+                          ? 'Send to barbers nearby'
+                          : 'Send request to ${m.barber.name}',
+                    ),
             ),
             const SizedBox(height: Gap.sm),
             Text(
-              'You pay a deposit to hold the slot. The barber is paid only '
-              'after the job is verified.',
+              m == null
+                  ? 'The first barber to accept takes the job and picks the time. '
+                        'You pay the deposit once someone accepts.'
+                  : '${m.barber.name} has 10 minutes to accept. If not, we ask '
+                        'other verified barbers nearby. You pay the deposit once '
+                        'someone accepts.',
               textAlign: TextAlign.center,
               style: context.text.bodySmall?.copyWith(
                 color: context.colors.onSurfaceVariant,

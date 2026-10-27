@@ -8,7 +8,7 @@ can get there.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 
 from .timeutil import SAST, ensure_utc
 
@@ -67,3 +67,27 @@ def next_slot(
 ) -> datetime | None:
     busy = list(busy)
     return next((s for s in candidate_slots(now) if is_free(s, minutes, busy)), None)
+
+
+# --- Time windows a client asks for; the barber who takes the job picks the start ---
+
+WINDOWS = {
+    "morning": (time(8, 0), time(12, 0)),
+    "afternoon": (time(12, 0), time(17, 0)),
+    "evening": (time(17, 0), time(20, 30)),
+}
+WINDOW_LABELS = {"morning": "Morning", "afternoon": "Afternoon", "evening": "Evening"}
+
+
+def window_of(slot: datetime) -> str | None:
+    t = ensure_utc(slot).astimezone(SAST).time()
+    return next((w for w, (start, end) in WINDOWS.items() if start <= t < end), None)
+
+
+def slots_in_windows(now: datetime, day: date, windows: Iterable[str]) -> list[datetime]:
+    """Bookable starts on `day` (SAST) inside any of `windows`, at least MIN_LEAD away."""
+    wanted = set(windows)
+    offset = (day - ensure_utc(now).astimezone(SAST).date()).days
+    if offset < 0:
+        return []
+    return [s for s in candidate_slots(now, offset) if s.date() == day and window_of(s) in wanted]

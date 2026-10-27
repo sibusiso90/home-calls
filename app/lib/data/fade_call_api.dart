@@ -53,6 +53,23 @@ abstract interface class FadeCallApi {
     required double lng,
   });
 
+  // Booking requests: the client asks for time windows, a barber takes it.
+  /// [barberId] null asks every barber in range.
+  Future<HomeCallRequest> createRequest({
+    required String quoteId,
+    required DateTime day,
+    required List<TimeWindow> windows,
+    required String address,
+    required double lat,
+    required double lng,
+    String? barberId,
+  });
+  Future<List<HomeCallRequest>> requests();
+  Future<HomeCallRequest> request(String id);
+  Future<Job> acceptRequest(String id, {required DateTime slotStart});
+  Future<void> declineRequest(String id);
+  Future<HomeCallRequest> cancelRequest(String id);
+
   // Jobs
   Future<List<Job>> jobs();
   Future<Job> job(String id);

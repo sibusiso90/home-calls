@@ -148,6 +148,26 @@ The overlay URLs are PNGs of the photo with the SAM 3.1 hair mask tinted on top.
 - Time charge is R5 per started 10 minutes over 30 minutes.
 - Ranking score = 0.35 tier + 0.25 verified jobs (capped at 20) + 0.25 rating + 0.15 proximity, each normalised to 0–1. A rating of `null` counts as 0.6.
 
+### Booking requests (how clients book)
+
+The client asks for a day and one or more time windows; the barber who takes the job picks the exact start.
+
+`POST /requests` (client) `{"quote_id", "day": "2026-10-28", "windows": ["afternoon", "evening"], "address", "lat", "lng", "barber_id": "uuid|null"}`
+
+- Windows (SAST start times): `morning` 08:00–12:00, `afternoon` 12:00–17:00, `evening` 17:00–20:00. A window must still hold a start at least an hour away (422 otherwise).
+- With `barber_id`, that barber has 10 minutes to accept. If they decline or time runs out, every approved barber in travel range is asked. With no `barber_id`, everyone in range is asked at once.
+- A request expires when no start time is left in its windows.
+
+`GET /requests`: a barber gets the open requests offered to them, with their own `price`, `distance_km` and free `slots` inside the windows; a client gets their own; an operator gets all. `GET /requests/{id}` returns one.
+
+`POST /requests/{id}/accept` (barber) `{"slot_start": "..."}` books a **confirmed** job at that start (must be inside the windows and free) and returns the job. The client then pays the deposit.
+
+`POST /requests/{id}/decline` (barber) and `POST /requests/{id}/cancel` (client).
+
+Notifications `request_new`, `request_accepted` and `request_update` carry `request_id`. Timeouts are applied on every notification poll and request read, plus a once-a-minute Modal cron.
+
+`POST /jobs` books an exact slot directly; the app now books through requests instead.
+
 `POST /jobs`
 
 ```json

@@ -6,4 +6,5 @@ export 'json.dart';
 export 'notification.dart';
 export 'ops.dart';
 export 'quote.dart';
+export 'request.dart';
 export 'user.dart';

@@ -17,7 +17,7 @@ from .ai import make_model_client
 from .config import Settings, get_settings
 from .db import Base, make_engine, make_sessionmaker
 from .errors import install_error_handlers
-from .routers import barbers, clients, jobs, notifications, ops, system
+from .routers import barbers, clients, jobs, notifications, ops, requests, system
 from .services import notifications as notify_svc
 from .storage import UrlSigner, make_storage, request_base_url
 
@@ -94,6 +94,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         jobs.router,
         ops.router,
         notifications.router,
+        requests.router,
     ):
         app.include_router(r)
     return app

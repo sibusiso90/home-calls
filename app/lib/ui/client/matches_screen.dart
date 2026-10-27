@@ -56,6 +56,26 @@ class MatchesScreen extends ConsumerWidget {
                   style: context.text.bodyMedium,
                 ),
               ),
+            OutlinedButton.icon(
+              key: const ValueKey('ask-everyone'),
+              onPressed: () => showBookingSheet(
+                context,
+                quoteId: quoteId,
+                match: null,
+                areaId: quote?.areaId,
+                minutes: quote?.minutes,
+              ),
+              icon: const Icon(Icons.campaign_outlined),
+              label: Text('Ask all ${list.length} nearby barbers'),
+            ),
+            const SizedBox(height: Gap.xs),
+            Text(
+              'Or ask one barber below. They get 10 minutes to accept before '
+              'we ask the others.',
+              textAlign: TextAlign.center,
+              style: context.text.bodySmall,
+            ),
+            const SizedBox(height: Gap.md),
             for (final (i, m) in list.indexed) ...[
               MatchCard(
                 match: m,
@@ -187,7 +207,7 @@ class MatchCard extends StatelessWidget {
                 icon: Icons.event_available_rounded,
                 text: match.nextSlot == null
                     ? 'No open slot'
-                    : 'Next: ${formatSlot(match.nextSlot)}',
+                    : 'Free from ${formatSlot(match.nextSlot)}',
               ),
               for (final s in b.styles.take(2))
                 _InfoChip(icon: Icons.content_cut_rounded, text: s),
@@ -214,7 +234,7 @@ class MatchCard extends StatelessWidget {
           FilledButton(
             onPressed: match.nextSlot == null ? null : onBook,
             child: Text(
-              'Book ${b.name.split(' ').first} for ${rand(match.price.totalZar)}',
+              'Ask ${b.name.split(' ').first} · ${rand(match.price.totalZar)}',
             ),
           ),
         ],
