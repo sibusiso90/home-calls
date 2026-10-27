@@ -48,7 +48,8 @@ All settings are optional; see `.env.example`.
 | `MODEL_API_KEY` | unset → mock | Meta Model API key; set it to go live |
 | `MODEL_API_BASE_URL` | `https://api.meta.ai/v1` | |
 | `SPARK_MODEL` / `TRANSCRIBE_MODEL` / `SAM_MODEL` | `muse-spark-1.3` / `muse-voice-transcribe-1.0` / `sam-3.1` | |
-| `MODEL_TIMEOUT_S`, `MODEL_MAX_RETRIES` | `90`, `3` | Retries back off on 429/5xx (honours `Retry-After`) |
+| `MODEL_TIMEOUT_S`, `MODEL_MAX_RETRIES` | `45`, `3` | Per attempt; retries back off on 429/5xx (honours `Retry-After`) |
+| `MODEL_DEADLINE_S` | `60` | Hard cap per model call, retries included; then a clean 502 `model_error` |
 | `MOCK_FORCE_REVIEW` | `false` | Mock only: `cut_match` comes back `uncertain` → `needs_review` |
 | `MOCK_LATENCY_MS` | `0` | Mock only: simulated model latency |
 | `DATABASE_URL` | `sqlite:///./fadecall.db` | Postgres URLs (`postgres://…`) use psycopg 3 |
@@ -126,21 +127,19 @@ uv run ruff check && uv run ruff format --check
 
 ## Deploy on Modal
 
+Full runbook: [`docs/deploy.md`](../docs/deploy.md). In short:
+
 ```bash
 cd backend
-uv run modal setup            # once
-uv run modal secret create fadecall \
-  MODEL_API_KEY=... DATABASE_URL=postgresql://... \
-  SUPABASE_URL=https://<project>.supabase.co SUPABASE_SERVICE_KEY=... \
-  SECRET_KEY=$(openssl rand -hex 32) OPERATOR_PASSCODE=...
-uv run modal serve modal_app.py    # dev URL with live reload
-uv run modal deploy modal_app.py   # persistent https://<workspace>--fade-call-api.modal.run
+uv run modal setup                                              # once
+uv run modal secret create fadecall --from-dotenv .env.modal    # DATABASE_URL, SUPABASE_*, SECRET_KEY, ...
+uv run modal deploy modal_app.py      # https://<workspace>--fade-call-api.modal.run (+ crons)
+uv run modal run modal_app.py::smoke  # live model smoke test inside the image
+make -C .. deploy MODAL_URL=https://<workspace>--fade-call-api.modal.run   # + web app, one origin
 ```
 
 The image installs ffmpeg and syncs dependencies from `uv.lock`. On Modal it uses
-`STORAGE_BACKEND=supabase`, because container disk is ephemeral. Before the first deploy,
-apply the migration to Supabase (SQL editor or `supabase db push`). Set
-`PUBLIC_BASE_URL` to the Modal URL if signed media links must be absolute behind a proxy.
+`STORAGE_BACKEND=supabase`, because container disk is ephemeral.
 
 ## Live checks, prompt evals and phone testing
 

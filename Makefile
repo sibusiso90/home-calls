@@ -1,7 +1,7 @@
 # Local pipeline. `make check` runs what CI runs.
 API_BASE_URL ?= http://localhost:8000
 
-.PHONY: check backend-check app-check backend app seed dev web
+.PHONY: check backend-check app-check backend app seed dev web deploy
 
 check: backend-check app-check
 
@@ -26,3 +26,10 @@ web:
 
 dev:
 	./scripts/dev.sh
+
+# Build the web app against the Modal URL and deploy API + web on one origin (docs/deploy.md).
+#   make deploy MODAL_URL=https://<workspace>--fade-call-api.modal.run
+deploy:
+	@test -n "$(MODAL_URL)" || { echo "usage: make deploy MODAL_URL=https://<workspace>--fade-call-api.modal.run"; exit 2; }
+	cd app && flutter build web --release --dart-define=API_BASE_URL=$(MODAL_URL)
+	cd backend && FADECALL_WEB_DIR=../app/build/web uv run modal deploy modal_app.py

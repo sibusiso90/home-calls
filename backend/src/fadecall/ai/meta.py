@@ -14,7 +14,8 @@ import io
 import json
 import logging
 import random
-from typing import Any
+from collections.abc import Awaitable
+from typing import Any, TypeVar
 
 import httpx
 import openai
@@ -28,7 +29,9 @@ from .types import Segmentation, Transcript
 
 log = logging.getLogger(__name__)
 
-RETRY_STATUS = {429, 500, 502, 503}
+RETRY_STATUS = {429, 500, 502, 503}  # 504 is not retried (docs: "do not simply retry")
+
+T = TypeVar("T")
 
 
 def data_url(image_bytes: bytes) -> str:
@@ -84,6 +87,18 @@ class MetaModelClient:
         schema: dict[str, Any],
         name: str,
     ) -> dict[str, Any]:
+        return await self._within_deadline(
+            f"Muse Spark ({name})", self._spark_json(system, user_text, images, schema, name)
+        )
+
+    async def _spark_json(
+        self,
+        system: str,
+        user_text: str,
+        images: list[bytes],
+        schema: dict[str, Any],
+        name: str,
+    ) -> dict[str, Any]:
         content: list[dict[str, Any]] = [{"type": "text", "text": user_text}]
         content += [{"type": "image_url", "image_url": {"url": data_url(i)}} for i in images]
         try:
@@ -131,10 +146,18 @@ class MetaModelClient:
             "request": (None, json.dumps(request), "application/json"),
             "audio": ("audio.wav", wav_bytes, "audio/wav"),
         }
-        resp = await self._post_with_retry(
-            "asr/transcribe", files=files, headers={"Accept": "application/json"}
+        resp = await self._within_deadline(
+            "Muse Voice Transcribe",
+            self._post_with_retry(
+                "asr/transcribe", files=files, headers={"Accept": "application/json"}
+            ),
         )
-        body = resp.json()
+        try:
+            body = resp.json()
+        except ValueError as exc:
+            raise ModelError(f"Transcription returned non-JSON: {resp.text[:200]}") from exc
+        if not isinstance(body, dict):
+            raise ModelError("Transcription returned a non-object")
         return Transcript(
             text=str(body.get("transcript", "")).strip(),
             duration_ms=body.get("audioDurationMs"),
@@ -159,6 +182,15 @@ class MetaModelClient:
             raise ModelError(f"Transcription failed ({resp.status_code}): {resp.text[:300]}")
         raise ModelError("Transcription failed after retries")
 
+    async def _within_deadline(self, what: str, call: Awaitable[T]) -> T:
+        """Cap a whole model call (retries included) so a web request never hangs."""
+        try:
+            async with asyncio.timeout(self.settings.model_deadline_s):
+                return await call
+        except TimeoutError as exc:
+            deadline = self.settings.model_deadline_s
+            raise ModelError(f"{what} timed out after {deadline:.0f} s") from exc
+
     @staticmethod
     def _backoff(attempt: int, retry_after: str | None) -> float:
         if retry_after:
@@ -171,35 +203,60 @@ class MetaModelClient:
     # -- SAM 3.1 --------------------------------------------------------------
     async def segment_hair(self, image_bytes: bytes) -> Segmentation:
         width, height = image_size(image_bytes)
-        chunks: list[str] = []
+        text = await self._within_deadline("SAM 3.1", self._sam_stream(image_bytes))
         try:
-            stream = await self._openai.responses.create(
-                model=self.settings.sam_model,
-                input=[
-                    {
-                        "type": "message",
-                        "role": "user",
-                        "content": [
-                            {"type": "input_text", "text": "hair"},
-                            {"type": "input_image", "image_url": data_url(image_bytes)},
-                        ],
-                    }
-                ],
-                stream=True,
-                metadata={"mask_encoding": "one_bit"},
-            )
-            async for event in stream:
-                etype = getattr(event, "type", "")
-                if etype == "response.output_text.delta":
-                    chunks.append(getattr(event, "delta", "") or "")
-                elif etype == "response.completed":
-                    break
-                elif etype in ("response.failed", "error", "response.incomplete"):
-                    raise ModelError(f"SAM 3.1 stream ended with {etype}")
-        except openai.APIError as exc:
-            log.warning("SAM 3.1 failed: %s", exc)
-            raise ModelError(f"SAM 3.1 failed: {exc}") from exc
-        try:
-            return parse_sam_output("".join(chunks), width, height)
+            return parse_sam_output(text, width, height)
         except Exception as exc:  # parser/decoder errors
             raise ModelError(f"Could not parse SAM 3.1 output: {exc}") from exc
+
+    async def _sam_stream(self, image_bytes: bytes) -> str:
+        """Stream one SAM call; retry the full request on a mid-stream interruption.
+
+        HTTP-level 429/5xx and connect failures are retried by the SDK. A terminal
+        `error` event or a connection dropped mid-stream is retried here (the docs
+        say to "retry the full request").
+        """
+        attempts = self.settings.model_max_retries + 1
+        for attempt in range(attempts):
+            chunks: list[str] = []
+            try:
+                stream = await self._openai.responses.create(
+                    model=self.settings.sam_model,
+                    input=[
+                        {
+                            "type": "message",
+                            "role": "user",
+                            "content": [
+                                {"type": "input_text", "text": "hair"},
+                                {"type": "input_image", "image_url": data_url(image_bytes)},
+                            ],
+                        }
+                    ],
+                    stream=True,
+                    metadata={"mask_encoding": "one_bit"},
+                )
+                async with stream:
+                    async for event in stream:
+                        etype = getattr(event, "type", "")
+                        if etype == "response.output_text.delta":
+                            chunks.append(getattr(event, "delta", "") or "")
+                        elif etype == "response.completed":
+                            return "".join(chunks)
+                        elif etype in ("response.failed", "response.incomplete"):
+                            raise ModelError(f"SAM 3.1 stream ended with {etype}")
+                        elif etype == "error":
+                            raise _StreamInterrupted(getattr(event, "message", "") or etype)
+                raise _StreamInterrupted("stream closed before response.completed")
+            except (_StreamInterrupted, httpx.TransportError) as exc:
+                if attempt + 1 >= attempts:
+                    raise ModelError(f"SAM 3.1 stream interrupted: {exc}") from exc
+                log.warning("SAM 3.1 stream interrupted (%s); retrying", exc)
+                await asyncio.sleep(self._backoff(attempt, None))
+            except openai.APIError as exc:
+                log.warning("SAM 3.1 failed: %s", exc)
+                raise ModelError(f"SAM 3.1 failed: {exc}") from exc
+        raise ModelError("SAM 3.1 failed after retries")
+
+
+class _StreamInterrupted(Exception):
+    """A terminal `error` SSE event: the docs say to retry the full request."""

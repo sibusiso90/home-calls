@@ -82,10 +82,14 @@ class SupabaseStorage:
 
     def __init__(self, url: str, service_key: str, bucket: str) -> None:
         self.bucket = bucket
+        # Legacy service_role keys are JWTs and go in both headers. New secret keys
+        # (sb_secret_...) are not JWTs: Supabase rejects them as a Bearer token, so they
+        # go in `apikey` only and the gateway maps them to the service role.
+        headers = {"apikey": service_key}
+        if service_key.startswith("eyJ"):
+            headers["Authorization"] = f"Bearer {service_key}"
         self._http = httpx.AsyncClient(
-            base_url=url.rstrip("/") + "/storage/v1/",
-            headers={"Authorization": f"Bearer {service_key}", "apikey": service_key},
-            timeout=30.0,
+            base_url=url.rstrip("/") + "/storage/v1/", headers=headers, timeout=30.0
         )
 
     def _obj(self, key: str) -> str:

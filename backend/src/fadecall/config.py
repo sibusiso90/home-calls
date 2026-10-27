@@ -33,8 +33,11 @@ class Settings(BaseSettings):
     spark_model: str = "muse-spark-1.3"
     transcribe_model: str = "muse-voice-transcribe-1.0"
     sam_model: str = "sam-3.1"
-    model_timeout_s: float = 90.0
+    model_timeout_s: float = 45.0  # per HTTP attempt
     model_max_retries: int = 3
+    # Hard cap per model call, retries included. Modal cuts web requests at 150 s, and
+    # onboarding makes two calls in sequence, so keep 2x this well under 150.
+    model_deadline_s: float = 60.0
     ffmpeg_path: str = "ffmpeg"
 
     # Mock behaviour (only used when MODEL_API_KEY is unset)

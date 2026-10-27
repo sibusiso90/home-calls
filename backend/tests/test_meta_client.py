@@ -171,3 +171,63 @@ def test_sam_stream_parsed_into_masks(fake_client: tuple[MetaModelClient, FakeMe
     assert content[0] == {"type": "input_text", "text": "hair"}
     assert content[1]["type"] == "input_image"
     assert body["metadata"] == {"mask_encoding": "one_bit"}
+
+
+def _jpeg() -> bytes:
+    buf = io.BytesIO()
+    Image.new("RGB", (50, 40), "white").save(buf, "JPEG")
+    return buf.getvalue()
+
+
+def test_sam_retries_after_midstream_error_event(tmp_path: Path) -> None:
+    fake = FakeMeta()
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/responses"):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                err = {"type": "error", "code": "server_shutting_down", "message": "bye"}
+                sse = f"event: error\ndata: {json.dumps(err)}\n\n"
+                return httpx.Response(200, text=sse, headers={"content-type": "text/event-stream"})
+        return fake(request)
+
+    settings = make_settings(tmp_path, model_api_key="test-key", model_max_retries=2)
+    client = MetaModelClient(settings, transport=httpx.MockTransport(handler))
+    seg = asyncio.run(client.segment_hair(_jpeg()))
+    assert calls["n"] == 2 and len(seg.masks) == 1
+
+
+def test_transcribe_non_json_is_model_error(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="<html>gateway</html>")
+
+    settings = make_settings(tmp_path, model_api_key="test-key", model_max_retries=0)
+    client = MetaModelClient(settings, transport=httpx.MockTransport(handler))
+    with pytest.raises(ModelError, match="non-JSON"):
+        asyncio.run(client.transcribe(sine_wav(), ["English"]))
+
+
+def test_model_call_deadline_gives_model_error(tmp_path: Path) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(5)
+        return httpx.Response(200, json={})
+
+    settings = make_settings(
+        tmp_path, model_api_key="test-key", model_max_retries=0, model_deadline_s=0.2
+    )
+    client = MetaModelClient(settings, transport=httpx.MockTransport(handler))
+    with pytest.raises(ModelError, match="timed out"):
+        asyncio.run(client.spark_json("s", "u", [], P.CHECK_SCHEMA, P.SAME_PERSON_NAME))
+
+
+@pytest.mark.parametrize(
+    ("key", "bearer"), [("eyJhbGciOi.legacy.jwt", True), ("sb_secret_abc", False)]
+)
+def test_supabase_storage_auth_headers(key: str, bearer: bool) -> None:
+    from fadecall.storage import SupabaseStorage
+
+    store = SupabaseStorage("https://x.supabase.co", key, "fadecall-private")
+    assert store._http.headers["apikey"] == key
+    assert ("authorization" in store._http.headers) is bearer
+    asyncio.run(store.aclose())
