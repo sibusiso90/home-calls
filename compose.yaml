@@ -16,7 +16,7 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
       SUPABASE_URL: http://host.docker.internal:54321
-      SUPABASE_SERVICE_KEY: ${LOCAL_SUPABASE_SECRET_KEY:?run make local-up}
+      SUPABASE_SERVICE_KEY: ${LOCAL_SUPABASE_SECRET_KEY:-}
       SUPABASE_BUCKET: fadecall-private
       SECRET_KEY: local-docker-secret-not-for-prod-0123456789abcdef
       OPERATOR_PASSCODE: fadecall-local

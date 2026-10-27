@@ -25,7 +25,7 @@ make local-seed     # demo barbers, clients and jobs (mock models)
 Without a key the API runs on the mock models. To go live, set `MODEL_API_KEY` (and optionally `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_ID`) in `backend/.env`, which is gitignored, then recreate the container. Never put keys in `.env.example`, which is committed.
 
 ```bash
-docker compose up -d --wait
+make local-up
 curl -s localhost:8000/health       # "mode" should now be "live"
 docker compose exec api python -m fadecall.smoke
 ```
@@ -38,6 +38,6 @@ make local-reset    # wipe the database and bucket, reapply the migrations
 make local-down     # stop the API and Supabase (data is kept)
 ```
 
-After changing backend code, run `docker compose up -d --build --wait`. After changing the app, rebuild it with `cd app && flutter build web --release --dart-define=API_BASE_URL=http://localhost:8000`. The container mounts `app/build/web`, so a browser refresh picks it up.
+After changing backend code, run `make local-up` again. After changing the app, rebuild it with `cd app && flutter build web --release --dart-define=API_BASE_URL=http://localhost:8000`. The container mounts `app/build/web`, so a browser refresh picks it up.
 
-The keys in `compose.yaml` are the Supabase CLI's fixed local defaults, the same on every machine. Never use them anywhere else.
+The API container needs the local Supabase secret key. It isn't stored in `compose.yaml`: the `make local-*` targets read it from `supabase status` and pass it as `LOCAL_SUPABASE_SECRET_KEY`, so start, stop and rebuild the API through `make` rather than calling `docker compose up` directly.
