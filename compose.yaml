@@ -1,0 +1,31 @@
+# Local stack: the API container in front of a local Supabase (Postgres + Storage).
+# Supabase itself is started by its CLI (`make local-up`); see docs/local-docker.md.
+# SUPABASE_SERVICE_KEY is read from the running local Supabase by `make local-up`.
+services:
+  api:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    # MODEL_API_KEY (and the optional WhatsApp keys) come from backend/.env;
+    # the values under `environment` win for everything else.
+    env_file:
+      - path: ./backend/.env
+        required: false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
+      SUPABASE_URL: http://host.docker.internal:54321
+      SUPABASE_SERVICE_KEY: ${LOCAL_SUPABASE_SECRET_KEY:?run make local-up}
+      SUPABASE_BUCKET: fadecall-private
+      SECRET_KEY: local-docker-secret-not-for-prod-0123456789abcdef
+      OPERATOR_PASSCODE: fadecall-local
+      PUBLIC_BASE_URL: http://localhost:8000
+      SERVE_WEB_DIR: /web
+      STORAGE_BACKEND: supabase
+    volumes:
+      - ./app/build/web:/web:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      retries: 20
