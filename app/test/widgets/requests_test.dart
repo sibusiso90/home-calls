@@ -1,3 +1,4 @@
+import 'package:fade_call/core/format.dart';
 import 'package:fade_call/data/models/models.dart';
 import 'package:fade_call/ui/client/booking_sheet.dart';
 import 'package:fade_call/ui/widgets/request_cards.dart';
@@ -125,15 +126,14 @@ void main() {
     final accept = find.widgetWithText(FilledButton, 'Pick a time');
     expect(tester.widget<FilledButton>(accept).onPressed, isNull);
 
-    await tester.tap(find.text('14:30'));
+    // Chips show the slot in the machine's local time zone (CI runs on UTC),
+    // so derive the label the same way the widget does.
+    final slot = DateTime.parse('2026-10-28T14:30:00+02:00');
+    final label = formatTime(slot);
+    await tester.tap(find.text(label));
     await tester.pump();
-    await tester.tap(find.text('Accept for 14:30'));
+    await tester.tap(find.text('Accept for $label'));
     await tester.pump();
-    verify(
-      () => api.acceptRequest(
-        'r-1',
-        slotStart: DateTime.parse('2026-10-28T14:30:00+02:00'),
-      ),
-    ).called(1);
+    verify(() => api.acceptRequest('r-1', slotStart: slot)).called(1);
   });
 }

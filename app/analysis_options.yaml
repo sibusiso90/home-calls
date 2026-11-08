@@ -13,6 +13,7 @@ analyzer:
     unawaited_futures: warning
   exclude:
     - build/**
+    - web/**
 
 linter:
   rules:

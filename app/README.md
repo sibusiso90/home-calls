@@ -4,7 +4,7 @@ Flutter web app (installable PWA) for all three Fade Call roles: client, barber
 and operator. It talks to the FastAPI backend in `../backend` using
 [`docs/api-contract.md`](../docs/api-contract.md).
 
-Requires Flutter 3.44+ / Dart 3.12+.
+Requires Flutter 3.47+ / Dart 3.13+.
 
 ## Run
 

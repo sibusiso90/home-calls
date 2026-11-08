@@ -99,7 +99,7 @@ Real faces appear only with signed consent. The repository holds code and synthe
 
 ## Run it
 
-Needs `uv`, Flutter 3.44+ and ffmpeg.
+Needs `uv`, Flutter 3.47+ and ffmpeg.
 
 ```sh
 make seed     # synthetic demo data (no real faces)
